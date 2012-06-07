@@ -2,7 +2,7 @@ from __future__ import division
 from dolfin import *
 
 set_log_level(WARNING)
-do_plot = True
+do_plot = 'usS'
 #parameters["form_compiler"]["optimize"] = True
 #parameters["form_compiler"]["cpp_optimize"] = True
 #parameters["form_compiler"]["representation"] = 'quadrature'
@@ -113,9 +113,10 @@ while t < T-float(dt)/2:
     solve(lhs(eq1+eq2)==rhs(eq1+eq2), up_soln, bcs=bc_u)
 
     u_soln, p_soln = up_soln.split()
-    if do_plot:
+    if 'u' in do_plot:
         # plotting doesn't work correctly for u_soln, p_soln -- workaround:
         u_plot.assign(u_soln); plot(u_plot, title="u [t=%.2f]"%t)
+    if 'p' in do_plot:
         p_plot.assign(p_soln); plot(p_plot, title="p [t=%.2f]"%t)
 
     ##
@@ -126,7 +127,7 @@ while t < T-float(dt)/2:
     eq3 += f_upwind_flux(s_soln, u_soln)*jump(r)*dS
     solve(lhs(eq3)==rhs(eq3), s_soln)
 
-    if do_plot:
+    if 's' in do_plot:
         plot(s_soln, title="s [t=%.2f]"%t)
 
     ##
@@ -134,7 +135,7 @@ while t < T-float(dt)/2:
     ##
 
     s_anal.t = t
-    if do_plot:
+    if 'S' in do_plot:
         plot(s_anal, mesh=mesh, title="s analytical [t=%.2f]"%t)
     err = assemble(abs(s_soln-s_anal)*dx)
     print "t=%.3f |e|=%.3g"%(t, err)
