@@ -12,9 +12,10 @@ do_plot = True
 # Mesh
 ##
 
-N = 256
+N = 64
 mesh = UnitInterval(N)
 dim = mesh.topology().dim()
+hmin = MPI.min(mesh.hmin())
 h = CellSize(mesh)
 n = FacetNormal(mesh)
 
@@ -31,12 +32,18 @@ def kinv(s):
     return 1/k(s)
 
 def f(s):
-    return lmbda*s/k(s)
+    return lmbda*s*kinv(s)
 
-def f_h(s,u):
+def f_upwind_flux(s,u):
     un = (dot(u, n) + abs(dot(u, n))) / 2  # max(dot(u,n), 0)
+
+    #Ren upwind:
+    #   f_h(s) = f(s_+) max(u.n,0) + f(s_-) min(u.n,0)
     return (f(s('+'))*un('+') - f(s('-'))*un('-'))
 
+    #Vektet upwind (la f(s) = g'(s)s), s* kontinuerlig :
+    #   f_h(s) = g'(s*) ( s_+ max(u.n,0) + s_- min(u.n,0) )
+    #return lmbda*kinv(avg(s)) * (s('+')*un('+') - s('-')*un('-'))
 
 ##
 # Functions and spaces
@@ -76,8 +83,8 @@ bc_u = DirichletBC(W.sub(0), u_bval, u_boundary)
 # Parameters and sources
 ##
 
-dt = Constant(0.48/N)
-T = .3
+dt = Constant(hmin/2.1)
+T = 0.3
 
 q_u = Expression("(near(x[0],0.0) ? 1.0 : near(x[0],1.0) ? -1.0 : 0.0)") * 4/h
 q_s = Expression("(near(x[0],0.0) ? 1.0 : 0.0)") * 4/h
@@ -86,7 +93,8 @@ q_s = Expression("(near(x[0],0.0) ? 1.0 : 0.0)") * 4/h
 # Analytical solution
 ##
 
-s_anal = Expression("max(0.0, min(1.0, 1.0/(lmbda-1.0)*(sqrt(lmbda*t/x[0])-1.0)))", lmbda=lmbda, t=0)
+s_anal = Expression("max(0.0, min(1.0, 1.0/(lmbda-1)*(sqrt(lmbda*t/x[0])-1)))",
+                    lmbda=lmbda, t=0)
 
 ##
 # Time loop
@@ -106,7 +114,7 @@ while t < T-float(dt)/2:
 
     u_soln, p_soln = up_soln.split()
     if do_plot:
-        # plotting doesn't work correctly for u_soln, p_soln -- work around:
+        # plotting doesn't work correctly for u_soln, p_soln -- workaround:
         u_plot.assign(u_soln); plot(u_plot, title="u [t=%.2f]"%t)
         p_plot.assign(p_soln); plot(p_plot, title="p [t=%.2f]"%t)
 
@@ -115,7 +123,7 @@ while t < T-float(dt)/2:
     ##
 
     eq3 = (s-s_soln)/dt*r*dx - dot(f(s_soln)*u_soln, grad(r))*dx + dot(f(s_soln)*u_soln, n)*r*ds - q_s*r*dx
-    eq3 += f_h(s_soln, u_soln)*jump(r)*dS  #upwind flux
+    eq3 += f_upwind_flux(s_soln, u_soln)*jump(r)*dS
     solve(lhs(eq3)==rhs(eq3), s_soln)
 
     if do_plot:
@@ -128,7 +136,8 @@ while t < T-float(dt)/2:
     s_anal.t = t
     if do_plot:
         plot(s_anal, mesh=mesh, title="s analytical [t=%.2f]"%t)
-    print "t=%.2f |e|=%.3g"%(t, assemble(abs(s_soln-s_anal)*dx))
+    err = assemble(abs(s_soln-s_anal)*dx)
+    print "t=%.3f |e|=%.3g"%(t, err)
 
 if do_plot:
     interactive()
