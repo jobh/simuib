@@ -86,15 +86,21 @@ bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 # Parameters and sources
 ##
 
+def delta(V, pt):
+    # Unit area delta function in discrete space V
+    q = Function(V)
+    PointSource(V, pt).apply(q.vector())
+    q /= assemble(q*dx)
+    return q
+
 dt = Constant(hmin/dim/(dim+1))
 T = 0.3
 
-_sf = 8/(dim+1)/h
-q_u = Expression("(near(x[0],0.0) ? 1.0 : near(x[0],1.0) ? -1.0 : 0.0)") * _sf
-q_s = Expression("(near(x[0],0.0) ? 1.0 : 0.0)") * _sf
+q_u = delta(Q, Point(0.0)) - delta(Q, Point(1.0))
+q_s = delta(S, Point(0.0))
 
 ##
-# Analytical solution
+# Analytical solution_
 ##
 
 s_anal = Expression("max(0.0, min(1.0, 1.0/(lmbda-1)*(sqrt(lmbda*t/x[0])-1)))",
