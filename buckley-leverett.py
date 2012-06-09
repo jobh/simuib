@@ -12,8 +12,8 @@ do_plot = 'usS'
 # Mesh
 ##
 
-N = 64
-mesh = UnitInterval(N)
+mesh = UnitInterval(64)
+#mesh = UnitSquare(32,32)
 dim = mesh.topology().dim()
 hmin = MPI.min(mesh.hmin())
 h = CellSize(mesh)
@@ -31,8 +31,11 @@ def k(s):
 def kinv(s):
     return 1/k(s)
 
+def g_(s): # f(s) = g_(s)s
+    return lmbda*kinv(s)
+
 def f(s):
-    return lmbda*s*kinv(s)
+    return g_(s)*s
 
 def f_upwind_flux(s,u):
     un = (dot(u, n) + abs(dot(u, n))) / 2  # max(dot(u,n), 0)
@@ -43,7 +46,7 @@ def f_upwind_flux(s,u):
 
     #Vektet upwind (la f(s) = g'(s)s), s* kontinuerlig :
     #   f_h(s) = g'(s*) ( s_+ max(u.n,0) + s_- min(u.n,0) )
-    #return lmbda*kinv(avg(s)) * (s('+')*un('+') - s('-')*un('-'))
+    #return g_(avg(s)) * (s('+')*un('+') - s('-')*un('-'))
 
 ##
 # Functions and spaces
@@ -74,20 +77,21 @@ s_soln = Function(S)
 
 s_soln.vector()[:] = 0.0
 
-def u_boundary(x, on_boundary):
+def _bc_u_dom(x, on_boundary):
     return on_boundary if dim>1 else near(x[0],0.0)
-u_bval = Constant([0]*dim) if dim>1 else Constant(0)
-bc_u = DirichletBC(W.sub(0), u_bval, u_boundary)
+_bc_u_val = Constant([0]*dim) if dim>1 else Constant(0)
+bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 
 ##
 # Parameters and sources
 ##
 
-dt = Constant(hmin/2.1)
+dt = Constant(hmin/dim/(dim+1))
 T = 0.3
 
-q_u = Expression("(near(x[0],0.0) ? 1.0 : near(x[0],1.0) ? -1.0 : 0.0)") * 4/h
-q_s = Expression("(near(x[0],0.0) ? 1.0 : 0.0)") * 4/h
+_sf = 8/(dim+1)/h
+q_u = Expression("(near(x[0],0.0) ? 1.0 : near(x[0],1.0) ? -1.0 : 0.0)") * _sf
+q_s = Expression("(near(x[0],0.0) ? 1.0 : 0.0)") * _sf
 
 ##
 # Analytical solution
