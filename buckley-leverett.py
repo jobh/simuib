@@ -2,7 +2,7 @@ from __future__ import division
 from dolfin import *
 
 set_log_level(WARNING)
-do_plot = 'usS'
+do_plot = 'sS'
 #parameters["form_compiler"]["optimize"] = True
 #parameters["form_compiler"]["cpp_optimize"] = True
 #parameters["form_compiler"]["representation"] = 'quadrature'
@@ -18,6 +18,7 @@ dim = mesh.topology().dim()
 hmin = MPI.min(mesh.hmin())
 h = CellSize(mesh)
 n = FacetNormal(mesh)
+x = mesh.ufl_cell().x
 
 ##
 # Constitutive relations
@@ -70,6 +71,7 @@ up_soln = Function(W) # contains u_soln and p_soln
 u_plot = Function(V)
 p_plot = Function(Q)
 s_soln = Function(S)
+s_anal = Function(S)
 
 ##
 # Initial and boundary conditions
@@ -87,7 +89,7 @@ bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 ##
 
 def delta(V, pt):
-    # Unit area delta function in discrete space V
+    """Unit area delta function in discrete space V"""
     q = Function(V)
     PointSource(V, pt).apply(q.vector())
     q /= assemble(q*dx)
@@ -98,13 +100,6 @@ T = 0.3
 
 q_u = delta(Q, Point(0.0)) - delta(Q, Point(1.0))
 q_s = delta(S, Point(0.0))
-
-##
-# Analytical solution_
-##
-
-s_anal = Expression("max(0.0, min(1.0, 1.0/(lmbda-1)*(sqrt(lmbda*t/x[0])-1)))",
-                    lmbda=lmbda, t=0)
 
 ##
 # Time loop
@@ -141,12 +136,16 @@ while t < T-float(dt)/2:
         plot(s_soln, title="s [t=%.2f]"%t)
 
     ##
-    # Plot analytical solution, print error
+    # Calculate and plot analytical solution, print error
     ##
 
-    s_anal.t = t
+    s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/x)-1), S))
+    vec = s_anal.vector()
+    vec[vec>1.0] = 1.0
+    vec[vec<0.0] = 0.0
+
     if 'S' in do_plot:
-        plot(s_anal, mesh=mesh, title="s analytical [t=%.2f]"%t)
+        plot(s_anal, title="s analytical [t=%.2f]"%t)
     err = assemble(abs(s_soln-s_anal)*dx)
     print "t=%.3f |e|=%.3g"%(t, err)
 
