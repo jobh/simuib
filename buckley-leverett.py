@@ -88,18 +88,20 @@ bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 # Parameters and sources
 ##
 
-def delta(V, pt):
-    """Unit area delta function in discrete space V"""
+def delta(pt):
+    """Unit area delta function in discrete space"""
+    V = P1
     q = Function(V)
-    PointSource(V, pt).apply(q.vector())
-    q /= assemble(q*dx)
+    v = q.vector()
+    PointSource(V, pt).apply(v)
+    v[:] = v.array() / assemble(q*dx)
     return q
 
 dt = Constant(hmin/dim/(dim+1))
 T = 0.3
 
-q_u = delta(Q, Point(0.0)) - delta(Q, Point(1.0))
-q_s = delta(S, Point(0.0))
+q_u = delta(Point(0.0)) - delta(Point(1.0))
+q_s = delta(Point(0.0)) - s*delta(Point(1.0))
 
 ##
 # Time loop
