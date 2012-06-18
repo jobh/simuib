@@ -1,24 +1,42 @@
 from __future__ import division
+from util import *
 from dolfin import *
 
 set_log_level(WARNING)
-do_plot = 'sS'
 #parameters["form_compiler"]["optimize"] = True
 #parameters["form_compiler"]["cpp_optimize"] = True
 #parameters["form_compiler"]["representation"] = 'quadrature'
 #parameters["form_compiler"]["quadrature_degree"] = 1
 
+# Which plots to draw; any of 'mupslSL' (m:mesh, l:line, uppercase:analytical)
+do_plot = 'sSlLp'
+
 ##
 # Mesh
 ##
 
-mesh = UnitInterval(64)
-#mesh = UnitSquare(32,32)
+mesh = UnitInterval(32)   # Buckley-Leverett 1D (on line interval)
+#mesh = UnitCircle(64)    # Buckley-Leverett 2D (on circle, divided by 4)
+
+# Attributes of the global mesh
 dim = mesh.topology().dim()
 hmin = MPI.min(mesh.hmin())
+hmax = MPI.max(mesh.hmax())
+
+# Attributes of the cell/facets/points
 h = CellSize(mesh)
 n = FacetNormal(mesh)
 x = mesh.ufl_cell().x
+
+if dim == 2:
+    # Smooth the circle mesh
+    for i in range(10):
+        mesh.smooth()
+        if 'm' in do_plot:
+            plot(mesh)
+
+    # Create a line-plotter along y=0
+    plotline = PlotLine(mesh, lambda r:[r,0])
 
 ##
 # Constitutive relations
@@ -53,20 +71,24 @@ def f_upwind_flux(s,u):
 # Functions and spaces
 ##
 
+# General definitions (aliases)
 P0 = FunctionSpace(mesh, "DG", 0)
 P1 = FunctionSpace(mesh, "CG", 1)
 RT0 = FunctionSpace(mesh, "RT", 1) if dim>1 else P1
 
+# Spaces in use
 V = RT0
 Q = P0
 S = P0
 W = V*Q
 
+# Trial and test functions
 u, p = TrialFunctions(W)
 v, w = TestFunctions(W)
 s = TrialFunction(S)
 r = TestFunction(S)
 
+# Functions (with degrees of freedom vectors)
 up_soln = Function(W) # contains u_soln and p_soln
 u_plot = Function(V)
 p_plot = Function(Q)
@@ -79,29 +101,32 @@ s_anal = Function(S)
 
 s_soln.vector()[:] = 0.0
 
-def _bc_u_dom(x, on_boundary):
-    return on_boundary if dim>1 else near(x[0],0.0)
-_bc_u_val = Constant([0]*dim) if dim>1 else Constant(0)
+if dim == 1:
+    def _bc_u_dom(x, on_boundary): return on_boundary and x[0]<0.5
+    _bc_u_val = Constant(0)
+else:
+    # Scale outflow to 1. The pressure solution is sensitive to this value, and
+    # the boundary is not an exact circle.
+    def _bc_u_dom(x, on_boundary): return on_boundary
+    _bc_u_val = Expression(["x[0]*scale", "x[1]*scale"], scale=1)
+    _bc_u_val.scale = 1/assemble(dot(_bc_u_val, n)*ds, mesh=mesh)
 bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 
 ##
 # Parameters and sources
 ##
 
-def delta(pt):
-    """Unit area delta function in discrete space"""
-    V = P1
-    q = Function(V)
-    v = q.vector()
-    PointSource(V, pt).apply(v)
-    v[:] = v.array() / assemble(q*dx)
-    return q
+T = 0.6   # End time
 
-dt = Constant(hmin/dim/(dim+1))
-T = 0.3
+dt = Constant(hmin/dim/(dim+1)/(hmax/hmin)**2)
 
-q_u = delta(Point(0.0)) - delta(Point(1.0))
-q_s = delta(Point(0.0)) - s*delta(Point(1.0))
+delta = DeltaFunction(mesh)
+if dim == 1:
+    q_u = delta(Point(0.0)) - delta(Point(1.0))
+    q_s = delta(Point(0.0)) - s*delta(Point(1.0))
+else:
+    q_u = delta(Point(0.0,0.0))
+    q_s = delta(Point(0.0,0.0))
 
 ##
 # Time loop
@@ -109,10 +134,10 @@ q_s = delta(Point(0.0)) - s*delta(Point(1.0))
 
 t = 0
 while t < T-float(dt)/2:
-    t += float(dt)
+    t += float(dt)      # float(...) to extract the value of a Constant
 
     ##
-    # Solve and plot conservation equations
+    # Solve and plot conservation equations (coupled)
     ##
 
     eq1 = inner(kinv(s_soln)*u,v)*dx + p*div(v)*dx
@@ -134,22 +159,32 @@ while t < T-float(dt)/2:
     eq3 += f_upwind_flux(s_soln, u_soln)*jump(r)*dS
     solve(lhs(eq3)==rhs(eq3), s_soln)
 
-    if 's' in do_plot:
+    if 's' in do_plot or (dim==1 and 'l' in do_plot):
         plot(s_soln, title="s [t=%.2f]"%t)
+    if 'l' in do_plot and dim>1:
+        plotline(s_soln, title="s [t=%.2f]"%t)
 
     ##
     # Calculate and plot analytical solution, print error
     ##
 
-    s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/x)-1), S))
+    if dim == 1:
+        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/x)-1), P1))
+    else:
+        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/pi/dot(x,x))-1), P1))
     vec = s_anal.vector()
     vec[vec>1.0] = 1.0
     vec[vec<0.0] = 0.0
 
-    if 'S' in do_plot:
+    if 'S' in do_plot or (dim==1 and 'L' in do_plot):
         plot(s_anal, title="s analytical [t=%.2f]"%t)
+    if dim>1 and 'L' in do_plot:
+        plotline(s_anal, title="s analytical [t=%.2f]"%t)
+    if 'm' in do_plot:
+        plot(mesh)
     err = assemble(abs(s_soln-s_anal)*dx)
     print "t=%.3f |e|=%.3g"%(t, err)
 
 if do_plot:
+    # wait for user interaction (press 'q' to exit)
     interactive()
