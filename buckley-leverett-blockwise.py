@@ -1,6 +1,12 @@
 from __future__ import division
+"""A solver using blockwise preconditioning via cbc.block (bzr branch lp:cbc.block/1.0)"""
+
+import scipy
 from util import *
 from dolfin import *
+from block import *
+from block.iterative import *
+from block.algebraic.trilinos import *
 from common import *
 
 ##
@@ -74,23 +80,22 @@ RT0 = FunctionSpace(mesh, "RT", 1) if dim>1 else P1
 V = RT0
 Q = P0
 S = P0
-W = V*Q
 
 # Trial and test functions
-u, p = TrialFunctions(W)
-v, w = TestFunctions(W)
+u = TrialFunction(V)
+v = TestFunction(V)
+p = TrialFunction(Q)
+w = TestFunction(Q)
 s = TrialFunction(S)
 r = TestFunction(S)
 
 # Functions (with degrees of freedom vectors)
-up_soln = Function(W) # contains u_soln and p_soln
-u_plot = Function(V)
-p_plot = Function(Q)
+u_soln = Function(V)
+p_soln = Function(Q)
 s_soln = Function(S)
 s_anal = Function(S)
 
 # Derived functions
-u_soln, p_soln = up_soln.split()
 s_diff = s_soln - s_anal
 
 ##
@@ -108,7 +113,7 @@ else:
     def _bc_u_dom(x, on_boundary): return on_boundary
     _bc_u_val = Expression(["x[0]*scale", "x[1]*scale"], scale=1)
     _bc_u_val.scale = 1/assemble(dot(_bc_u_val, n)*ds, mesh=mesh)
-bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
+bc_u = DirichletBC(V, _bc_u_val, _bc_u_dom)
 
 ##
 # Parameters and sources
@@ -129,6 +134,7 @@ else:
 ##
 
 t = 0
+xx = None
 while t < T-float(dt)/2:
     t += float(dt)      # float(...) to extract the value of a Constant
 
@@ -138,7 +144,10 @@ while t < T-float(dt)/2:
 
     eq3 = (s-s_soln)/dt*r*dx - dot(f(s_soln)*u_soln, grad(r))*dx + dot(f(s_soln)*u_soln, n)*r*ds - q_s*r*dx
     eq3 += f_upwind_flux(s_soln, u_soln)*jump(r)*dS
-    solve(lhs(eq3)==rhs(eq3), s_soln)
+    A = assemble(lhs(eq3))
+    b = assemble(rhs(eq3))
+    Ainv = LGMRES(A, precond=ML(A), initial_guess=s_soln.vector())
+    s_soln.vector()[:] = Ainv*b
 
     if 's' in do_plot or (dim==1 and 'l' in do_plot):
         plot(s_soln, title="s [t=%.2f]"%t)
@@ -149,16 +158,39 @@ while t < T-float(dt)/2:
     # Solve and plot conservation equations (coupled)
     ##
 
-    eq1 = inner(kinv(s_soln)*u,v)*dx + p*div(v)*dx
-    eq2 = div(u)*w*dx - q_u*w*dx
-    solve(lhs(eq1+eq2)==rhs(eq1+eq2), up_soln, bcs=bc_u)
+    eq1_u = inner(kinv(s_soln)*u,v)*dx
+    eq1_p = p*div(v)*dx
+    eq2_u = div(u)*w*dx - q_u*w*dx
+    A = assemble(eq1_u)
+    B = assemble(eq1_p)
+    C = assemble(lhs(eq2_u))
+    c = assemble(rhs(eq2_u))
 
-    u_soln, p_soln = up_soln.split()
+    #   [A B] * [u] = [b]
+    #   [C 0]   [p]   [c]
+
+    AA = block_mat([[A, B],
+                    [C, 0]])
+    bb = block_vec([0, c])
+
+    bc = block_bc([bc_u, None])
+    bc.apply(AA, bb, symmetric=False)
+
+    Schur = collapse(-C*InvDiag(A)*B)
+    AAprec = block_mat([[A,   B    ],
+                        [C,   Schur]])
+    AAinv = BiCGStab(AA, initial_guess=xx,
+                     precond=AAprec.scheme('symmetric gauss-seidel', inverse=ML))
+
+    xx = AAinv*bb
+
+    u_soln.vector()[:] = xx[0]
+    p_soln.vector()[:] = xx[1]
+
     if 'u' in do_plot:
-        # plotting doesn't work correctly for u_soln, p_soln -- workaround:
-        u_plot.assign(u_soln); plot(u_plot, title="u [t=%.2f]"%t)
+        plot(u_soln, title="u [t=%.2f]"%t)
     if 'p' in do_plot:
-        p_plot.assign(p_soln); plot(p_plot, title="p [t=%.2f]"%t)
+        plot(p_soln, title="p [t=%.2f]"%t)
 
     ##
     # Calculate and plot analytical solution, print error

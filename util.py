@@ -1,8 +1,12 @@
+from __future__ import division
+"""Utility functions"""
+
 from dolfin import *
 
 class PlotLine(object):
-    """Line plot along x=[0,1] in 2D. The mapping argument maps from the
-    interval [0,1] to a 2D coordinate (a two-component list)."""
+    """Line plot along x=[0,1] in a domain of any dimension. The mapping
+    argument maps from the interval [0,1] to a xD coordinate (a list when
+    dim>1)."""
     def __init__(self, mesh, mapping):
         hmin = MPI.min(mesh.hmin())
         self.mesh = UnitInterval(int(1.0/hmin))
@@ -13,10 +17,9 @@ class PlotLine(object):
     def __call__(self, expr, title):
         if not expr in self.F:
             self.F[expr] = Function(self.V)
-        P1expr = project(expr, FunctionSpace(expr.function_space().mesh(), "CG", 1))
         v = self.F[expr].vector()
         for i,x in enumerate(self.mesh.coordinates()):
-            v[i] = P1expr(self.mapping(x))
+            v[i] = expr(self.mapping(x))
         plot(self.F[expr], title=title)
 
 class DeltaFunction(object):
