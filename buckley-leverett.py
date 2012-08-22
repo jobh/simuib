@@ -119,7 +119,7 @@ dt = Constant(hmin/dim/(dim+1)/(hmax/hmin))
 delta = DeltaFunction(mesh)
 if dim == 1:
     q_u = delta(Point(0.0)) - delta(Point(1.0))
-    q_s = delta(Point(0.0)) - s*delta(Point(1.0))
+    q_s = delta(Point(0.0)) - f(s_soln)*delta(Point(1.0))
 else:
     q_u = delta(Point(0.0,0.0))
     q_s = delta(Point(0.0,0.0))
