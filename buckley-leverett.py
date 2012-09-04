@@ -114,15 +114,21 @@ bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 # Parameters and sources
 ##
 
-dt = Constant(hmin/dim/(dim+1)/(hmax/hmin))
+# Strength of the pressure sources
+source_strength = 1;
 
 delta = DeltaFunction(mesh)
 if dim == 1:
-    q_u = delta(Point(0.0)) - delta(Point(1.0))
+    q_u = source_strength * delta(Point(0.0)) - source_strength * delta(Point(1.0))
     q_s = delta(Point(0.0)) - f(s_soln)*delta(Point(1.0))
 else:
     q_u = delta(Point(0.0,0.0))
     q_s = delta(Point(0.0,0.0))
+
+# Maximal admissible time step
+# The maxmimal cell volume should be bounded above by hmax^dim / dim 
+# at least for simplices in 1D and 2D
+dt = Constant(hmax**dim / (1.1 * dim  * source_strength * lmbda))
 
 ##
 # Time loop
@@ -149,7 +155,7 @@ while t < T-float(dt)/2:
     # Solve and plot conservation equations (coupled)
     ##
 
-    eq1 = inner(kinv(s_soln)*u,v)*dx + p*div(v)*dx
+    eq1 = inner(kinv(s_soln)*u,v)*dx - p*div(v)*dx
     eq2 = div(u)*w*dx - q_u*w*dx
     solve(lhs(eq1+eq2)==rhs(eq1+eq2), up_soln, bcs=bc_u)
 
@@ -165,9 +171,9 @@ while t < T-float(dt)/2:
     ##
 
     if dim == 1:
-        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/x)-1), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/x)-1)), P1))
     else:
-        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/pi/dot(x,x))-1), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/pi/dot(x,x))-1)), P1))
     vec = s_anal.vector()
     vec[vec>1.0] = 1.0
     vec[vec<0.0] = 0.0
