@@ -171,9 +171,9 @@ while t < T-float(dt)/2:
     ##
 
     if dim == 1:
-        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/x)-1), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/x)-1)), P1))
     else:
-        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/pi/dot(x,x))-1), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/pi/dot(x,x))-1)), P1))
     vec = s_anal.vector()
     vec[vec>1.0] = 1.0
     vec[vec<0.0] = 0.0
