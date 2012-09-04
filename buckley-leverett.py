@@ -149,7 +149,7 @@ while t < T-float(dt)/2:
     # Solve and plot conservation equations (coupled)
     ##
 
-    eq1 = inner(kinv(s_soln)*u,v)*dx + p*div(v)*dx
+    eq1 = inner(kinv(s_soln)*u,v)*dx - p*div(v)*dx
     eq2 = div(u)*w*dx - q_u*w*dx
     solve(lhs(eq1+eq2)==rhs(eq1+eq2), up_soln, bcs=bc_u)
 
