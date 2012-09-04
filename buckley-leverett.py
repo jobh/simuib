@@ -114,15 +114,21 @@ bc_u = DirichletBC(W.sub(0), _bc_u_val, _bc_u_dom)
 # Parameters and sources
 ##
 
-dt = Constant(hmin/dim/(dim+1)/(hmax/hmin))
+# Strength of the pressure sources
+source_strength = 1;
 
 delta = DeltaFunction(mesh)
 if dim == 1:
-    q_u = delta(Point(0.0)) - delta(Point(1.0))
+    q_u = source_strength * delta(Point(0.0)) - source_strength * delta(Point(1.0))
     q_s = delta(Point(0.0)) - f(s_soln)*delta(Point(1.0))
 else:
     q_u = delta(Point(0.0,0.0))
     q_s = delta(Point(0.0,0.0))
+
+# Maximal admissible time step
+# The maxmimal cell volume should be bounded above by hmax^dim / dim 
+# at least for simplices in 1D and 2D
+dt = Constant(hmax**dim / (1.1 * dim  * source_strength * lmbda))
 
 ##
 # Time loop
