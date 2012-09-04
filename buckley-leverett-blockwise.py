@@ -119,19 +119,21 @@ bc_u = DirichletBC(V, _bc_u_val, _bc_u_dom)
 # Parameters and sources
 ##
 
-dt = Constant(hmin/dim/(dim+1)/(hmax/hmin))
+# Strength of the pressure sources
+source_strength = 1;
 
 delta = DeltaFunction(mesh)
 if dim == 1:
-    q_u = delta(Point(0.0)) - delta(Point(1.0))
-    q_s = delta(Point(0.0)) - s*delta(Point(1.0))
+    q_u = source_strength * delta(Point(0.0)) - source_strength * delta(Point(1.0))
+    q_s = delta(Point(0.0)) - f(s_soln)*delta(Point(1.0))
 else:
     q_u = delta(Point(0.0,0.0))
     q_s = delta(Point(0.0,0.0))
 
-##
-# Time loop
-##
+# Maximal admissible time step
+# The maxmimal cell volume should be bounded above by hmax^dim / dim 
+# at least for simplices in 1D and 2D
+dt = Constant(hmax**dim / (1.1 * dim  * source_strength * lmbda))
 
 t = 0
 xx = None
@@ -160,7 +162,7 @@ while t < T-float(dt)/2:
 
     eq1_u = inner(kinv(s_soln)*u,v)*dx
     eq1_p = p*div(v)*dx
-    eq2_u = div(u)*w*dx - q_u*w*dx
+    eq2_u = div(u)*w*dx + q_u*w*dx
     A = assemble(eq1_u)
     B = assemble(eq1_p)
     C = assemble(lhs(eq2_u))
@@ -197,9 +199,9 @@ while t < T-float(dt)/2:
     ##
 
     if dim == 1:
-        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/x)-1), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/x)-1)), P1))
     else:
-        s_anal.assign(project((1.0/(lmbda-1)*sqrt(lmbda*Constant(t)/pi/dot(x,x))-1), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/pi/dot(x,x))-1)), P1))
     vec = s_anal.vector()
     vec[vec>1.0] = 1.0
     vec[vec<0.0] = 0.0
