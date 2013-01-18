@@ -7,8 +7,6 @@ from block.algebraic.trilinos import *
 
 from block.dolfin_util import *
 
-
-
 def get_command_line_arguments():
     dict = {}
     if len(sys.argv) == 1: return dict
@@ -30,27 +28,13 @@ def dump_matrix(filename, name, AA):
 
 cl_args = get_command_line_arguments()
 
-N = 4 
-if cl_args.has_key("N"):
-    N = int(cl_args["N"])   
+N          = int  (cl_args.get("N",        4))
+mu_val     = float(cl_args.get("mu",       1))
+lambda_val = float(cl_args.get("lambda",   1))
+true_eps   = bool (cl_args.get("true_eps", True))
+K_val      = float(cl_args.get("K",        1))
 
-mu_val = 1 
-if cl_args.has_key("mu"):
-    mu_val = float(cl_args["mu"])   
-
-lambda_val = 1 
-if cl_args.has_key("lambda"):
-    lambda_val = float(cl_args["lambda"])   
-
-true_eps = True 
-if cl_args.has_key("eps"):
-    true_eps = bool(cl_args["eps"])   
-
-K_val = 1 
-if cl_args.has_key("K"):
-    K_val = float(cl_args["K"])   
-
-mesh = UnitSquare(N, N)
+mesh = UnitSquareMesh(N, N)
 V = VectorFunctionSpace(mesh, "Lagrange", 2)
 Q = FunctionSpace(mesh, "Lagrange", 1)
 VQ = MixedFunctionSpace([V,Q])
@@ -82,51 +66,33 @@ AA, AArhs = block_symmetric_assemble([[a00, a01],
 
 
 [[A, B],
- [C, D]] = AA
+ [_, C]] = AA
 
 dump_matrix("A.m", "A", A)
 dump_matrix("B.m", "B", B)
 dump_matrix("C.m", "C", C)
-dump_matrix("D.m", "D", D)
 
 
 ofile_str = """
+A; B; C;
+BT = transpose(B);
 
-A; 
-B; 
-C; 
-D; 
+S = C - BT*inv(A)*B;
 
-AA = [A, B; C, -D]; 
-BB1 = [A, 0*B; 0*C, D + C*inv(A)*B];
-BB2 = [A, 0*B; 0*C, D];
-BB3 = [A, 0*B; C, D]*[inv(A), 0*B; 0*C, inv(D)]*[A, B; 0*C, D];
- 
-e1 = sort(abs(qz(AA, BB1))); 
-e2 = sort(abs(qz(AA, BB2))); 
-e3 = sort(abs(qz(AA, BB3))); 
+AA = [A, B; BT, C];
+BB1 = [A, 0*B; 0*BT, S];
+BB2 = [A, 0*B; 0*BT, C];
+BB3 = [A, 0*B; BT, C]*[inv(A), 0*B; 0*BT, inv(C)]*[A, B; 0*BT, C];
 
-plot(e1); 
-hold on; 
-plot(e2); 
-plot(e3); 
+hold on;
+e1 = sort(abs(qz(AA, BB1))); plot(e1, 'b;1;'); e1(end)/e1(1), drawnow;
+e2 = sort(abs(qz(AA, BB2))); plot(e2, 'r;2;'); e2(end)/e2(1), drawnow;
+e3 = sort(abs(qz(AA, BB3))); plot(e3, 'g;3;'); e3(end)/e3(1), drawnow;
+
 sleep(4);
-
-e1(1)/e1(size(e1)(1))
-e2(1)/e2(size(e2)(1))
-e3(1)/e3(size(e3)(1))
-
 """
 
 ofile = open("ofile.m", "w")
 ofile.write(ofile_str)
 ofile.close()
-os.system("octave ofile.m")
-
-
-
-
-
-
-
-
+os.system("octave -q ofile.m")
