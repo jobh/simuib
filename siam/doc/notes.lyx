@@ -1,0 +1,518 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\use_default_options true
+\begin_modules
+theorems-ams
+eqs-within-sections
+figs-within-sections
+\end_modules
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format pdf2
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize a4paper
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\use_mhchem 1
+\use_mathdots 1
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 0
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Standard
+We look at the discretization of the Biot equations on the form
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\mathcal{A}\equiv\begin{bmatrix}A & B\\
+B^{T} & C
+\end{bmatrix}\begin{pmatrix}d\\
+p
+\end{pmatrix}=\begin{pmatrix}r_{d}\\
+r_{p}
+\end{pmatrix}
+\]
+
+\end_inset
+
+Here 
+\begin_inset Formula $A$
+\end_inset
+
+ discretizes the linear elastic equations, 
+\begin_inset Formula $B$
+\end_inset
+
+ and 
+\begin_inset Formula $B^{T}$
+\end_inset
+
+ are discrete gradients and transposes, while 
+\begin_inset Formula $C=bI+C'$
+\end_inset
+
+ discretizes the pressure equation, with 
+\begin_inset Formula $C'$
+\end_inset
+
+ being the Darcy terms.
+ Primary variables are given as pressure 
+\begin_inset Formula $p$
+\end_inset
+
+ and displacement 
+\begin_inset Formula $d$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+Schur complement forms
+\end_layout
+
+\begin_layout Standard
+The inverse of 
+\begin_inset Formula $\mathcal{A}$
+\end_inset
+
+ can be written by means of the Schur complement as either (pressure form)
+\begin_inset Formula 
+\[
+\mathcal{A}^{-1}=\begin{bmatrix}I & -A^{-1}B\\
+0 & I
+\end{bmatrix}\begin{bmatrix}A^{-1} & 0\\
+0 & S_{C}^{-1}
+\end{bmatrix}\begin{bmatrix}I & 0\\
+-B^{T}A^{-1} & I
+\end{bmatrix},
+\]
+
+\end_inset
+
+or on the displacement form
+\begin_inset Formula 
+\[
+\mathcal{A}^{-1}=\begin{bmatrix}I & 0\\
+-C^{-1}B^{T} & I
+\end{bmatrix}\begin{bmatrix}S_{A}^{-1} & 0\\
+0 & C^{-1}
+\end{bmatrix}\begin{bmatrix}I & -BC^{-1}\\
+0 & I
+\end{bmatrix}.
+\]
+
+\end_inset
+
+Here the Schur complements are defined as
+\begin_inset Formula 
+\[
+S_{C}\equiv C-B^{T}A^{-1}B
+\]
+
+\end_inset
+
+and
+\begin_inset Formula 
+\[
+S_{A}\equiv A-BC^{-1}B^{T}.
+\]
+
+\end_inset
+
+The Schur complement is expensive to calculate, and when used as a preconditione
+r it is sufficient and preferable to approximate it by applying a cheap
+ approximate inversion of 
+\begin_inset Formula $A$
+\end_inset
+
+ and 
+\begin_inset Formula $C$
+\end_inset
+
+, respectively.
+\end_layout
+
+\begin_layout Subsection
+Drained split
+\end_layout
+
+\begin_layout Standard
+The drained split is defined as a splitting of the original equations while
+ keeping the fluid pressure constant over the splitting step, e.g.
+\begin_inset Formula 
+\[
+p^{*}=p_{k}.
+\]
+
+\end_inset
+
+Here 
+\begin_inset Formula $p^{*}$
+\end_inset
+
+ is the (virtual) pressure after the splitting step.
+ This leads to the mechanical system
+\begin_inset Formula 
+\[
+d_{k+1}=d_{k}-A^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}u_{k}-r_{d}\right).
+\]
+
+\end_inset
+
+Subsequently, the fluid system is solved normally
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\[
+p_{k+1}=p_{k}-C^{-1}\left(\begin{bmatrix}B^{T} & C\end{bmatrix}\begin{pmatrix}d_{k+1}\\
+p_{k}
+\end{pmatrix}-r_{p}\right).
+\]
+
+\end_inset
+
+Combining the two steps in matrix form yields
+\begin_inset Formula 
+\[
+u_{k+1}=u_{k}-\left\{ \begin{bmatrix}A^{-1} & 0\\
+0 & C^{-1}
+\end{bmatrix}\begin{bmatrix}I & 0\\
+-B^{T}A^{-1} & I
+\end{bmatrix}\right\} (\mathcal{A}u-r),
+\]
+
+\end_inset
+
+where the expression in curly brackets forms the preconditioner.
+ We recognize this as a Gauss-Seidel iteration.
+\end_layout
+
+\begin_layout Subsection
+Undrained split
+\end_layout
+
+\begin_layout Standard
+The undrained split is defined as a splitting of the original equations
+ while keeping the fluid mass constant over the splitting step, e.g.
+\begin_inset Formula 
+\[
+B^{T}d_{k+1}+bIp^{*}=m^{*}=m_{k}=B^{T}d_{k}+bIp_{k}.
+\]
+
+\end_inset
+
+Here 
+\begin_inset Formula $p^{*}$
+\end_inset
+
+ and 
+\begin_inset Formula $m^{*}$
+\end_inset
+
+ are the (virtual) pressure and mass after the splitting step.
+ This leads to the mechanical system
+\begin_inset Formula 
+\[
+d_{k+1}=d_{k}-(A-b^{-1}BB^{T})^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}u_{k}-r_{d}\right).
+\]
+
+\end_inset
+
+Subsequently, the fluid system is solved normally,
+\begin_inset Formula 
+\[
+p_{k+1}=p_{k}-C^{-1}\left(\begin{bmatrix}B^{T} & C\end{bmatrix}\begin{pmatrix}d_{k+1}\\
+p_{k}
+\end{pmatrix}-r_{p}\right).
+\]
+
+\end_inset
+
+Combining the two steps in matrix form yields
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\[
+u_{k+1}=u_{k}-\left\{ \begin{bmatrix}\hat{S}_{A}^{-1} & 0\\
+0 & C^{-1}
+\end{bmatrix}\begin{bmatrix}I & 0\\
+-B^{T}\hat{S}_{A}^{-1} & I
+\end{bmatrix}\right\} (\mathcal{A}u-r),
+\]
+
+\end_inset
+
+where the expression in curly brackets forms the preconditioner, and
+\begin_inset Formula 
+\[
+\hat{S}_{A}\equiv A-b^{-1}BB^{T}
+\]
+
+\end_inset
+
+denotes an approximate Schur complement omitting the Darcy terms.
+ Note that this is not the usual Schur-complement type formulation, as the
+ right-hand side of the Schur-complement system is not consistent.
+\end_layout
+
+\begin_layout Subsection
+Fixed strain
+\end_layout
+
+\begin_layout Standard
+The fixed strain split is defined as a splitting of the original equations
+ while keeping the trace of the strain constant over the splitting step,
+ e.g.
+\begin_inset Formula 
+\[
+\textrm{tr\,}\varepsilon^{*}=\nabla\cdot d^{*}=\nabla\cdot d_{k}
+\]
+
+\end_inset
+
+Here 
+\begin_inset Formula $d^{*}$
+\end_inset
+
+ is the (virtual) displacement after the splitting step, and 
+\begin_inset Formula $\nabla\cdot d$
+\end_inset
+
+ is discretized by 
+\begin_inset Formula $B^{T}d$
+\end_inset
+
+.
+ This leads to the fluid system
+\begin_inset Formula 
+\[
+p_{k+1}=p_{k}-C^{-1}\left(\begin{bmatrix}B^{T} & C\end{bmatrix}u_{k}-r_{p}\right).
+\]
+
+\end_inset
+
+Subsequently, the displacement system is solved normally,
+\begin_inset Formula 
+\[
+d_{k+1}=d_{k}-A^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}\begin{pmatrix}d_{k}\\
+p_{k+1}
+\end{pmatrix}-r_{d}\right).
+\]
+
+\end_inset
+
+Combining the two steps in matrix form yields
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\[
+u_{k+1}=u_{k}-\left\{ \begin{bmatrix}A^{-1} & 0\\
+0 & C^{-1}
+\end{bmatrix}\begin{bmatrix}I & -BC^{-1}\\
+0 & I
+\end{bmatrix}\right\} (\mathcal{A}u-r),
+\]
+
+\end_inset
+
+where the expression in curly brackets forms the preconditioner.
+ The fixed strain split is a Gauss-Seidel iteration, and is identical to
+ the drained split, but offset by one-half splitting step.
+ When used as preconditioners for an iterative method, they thus build essential
+ly equivalent Krylov subspaces.
+\end_layout
+
+\begin_layout Subsection
+Fixed stress
+\end_layout
+
+\begin_layout Standard
+The fixed stress split is defined as a splitting of the original equations
+ while keeping the trace of the stress constant over the splitting step,
+ e.g.
+\begin_inset Formula 
+\[
+\beta\nabla\cdot d^{*}-N_{d}p_{k+1}=\textrm{tr}\,\sigma^{*}=\textrm{tr}\,\sigma=\beta\nabla\cdot d_{k}-N_{d}p_{k}.
+\]
+
+\end_inset
+
+Here 
+\begin_inset Formula $d^{*}$
+\end_inset
+
+ and 
+\begin_inset Formula $\textrm{tr}\,\sigma^{*}$
+\end_inset
+
+ are the (virtual) displacement and volumetric stress after the splitting
+ step, and 
+\begin_inset Formula $\beta=2\mu+N_{d}\lambda$
+\end_inset
+
+ is the bulk modulus and 
+\begin_inset Formula $N_{d}$
+\end_inset
+
+ is the physical dimension of the problem.
+ This leads to the fluid system
+\begin_inset Formula 
+\[
+p_{k+1}=p_{k}-(C+\beta^{-1}N_{d}I)^{-1}\left(\begin{bmatrix}B^{T} & C\end{bmatrix}u_{k}-r_{p}\right).
+\]
+
+\end_inset
+
+Subsequently, the displacement system is solved normally
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\[
+d_{k+1}=d_{k}-A^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}\begin{pmatrix}d_{k}\\
+p_{k+1}
+\end{pmatrix}-r_{d}\right).
+\]
+
+\end_inset
+
+
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+Combining the two steps in matrix form yields
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\[
+u_{k+1}=u_{k}-\left\{ \begin{bmatrix}A^{-1} & 0\\
+0 & \hat{S}_{C}^{-1}
+\end{bmatrix}\begin{bmatrix}I & -B\hat{S}_{C}^{-1}\\
+0 & I
+\end{bmatrix}\right\} (\mathcal{A}u-r),
+\]
+
+\end_inset
+
+where the expression in curly brackets forms the preconditioner, and the
+ approximate Schur complement is given by
+\begin_inset Formula 
+\[
+\hat{S}_{C}\equiv C+\beta^{-1}N_{d}I.
+\]
+
+\end_inset
+
+This last preconditioner is particularly appealing from a legacy code perspectiv
+e, since the matrix structure of the Schur complement is identical to the
+ original matrix.
+\end_layout
+
+\end_body
+\end_document
