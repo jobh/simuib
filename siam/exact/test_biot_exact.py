@@ -2,10 +2,8 @@
 import sys
 from dolfin import *
 from block import *
-from block.iterative import *
-from block.algebraic.trilinos import *
-
 from block.dolfin_util import *
+import numpy
 
 def get_command_line_arguments():
     dict = {}
@@ -19,10 +17,9 @@ def get_command_line_arguments():
 def dump_matrix(filename, name, AA):
     f = open(filename, 'w')
     AA = AA.array()
-    for i in range(AA.shape[0]):
-        for j in range(AA.shape[1]):
-           if abs(AA[i,j]) > 10e-10:
-               f.write("%s (%d, %d) = %e;\n " % (name,i+1,j+1,AA[i,j]))
+    f.write("%s = sparse(%d,%d);"%(name,AA.shape[0],AA.shape[1]))
+    for (i,j) in zip(*numpy.where(AA)):
+        f.write("%s (%d, %d) = %e;\n " % (name,i+1,j+1,AA[i,j]))
 
 
 
@@ -68,31 +65,43 @@ AA, AArhs = block_symmetric_assemble([[a00, a01],
 [[A, B],
  [_, C]] = AA
 
-dump_matrix("A.m", "A", A)
-dump_matrix("B.m", "B", B)
-dump_matrix("C.m", "C", C)
+dump_matrix("Am.m", "A", A)
+dump_matrix("Bm.m", "B", B)
+dump_matrix("Cm.m", "C", C)
 
 
 ofile_str = """
-A; B; C;
+format compact;
+Am; Bm; Cm;
 BT = transpose(B);
 
-S = C - BT*inv(A)*B;
+IA = eye(size(A));
+IC = eye(size(C));
+B0 = zeros(size(B));
+BT0 = zeros(size(BT));
+
+Ai = full(inv(A)); Ci = full(inv(C));
+
+Aii = inv(diag(diag(A)));
+S = C - BT*Aii*B;
+Si = full(inv(S));
 
 AA = [A, B; BT, C];
-BB1 = [A, 0*B; 0*BT, S];
-BB2 = [A, 0*B; 0*BT, C];
-BB3 = [A, 0*B; BT, C]*[inv(A), 0*B; 0*BT, inv(C)]*[A, B; 0*BT, C];
+BB1 = [Ai, B0; BT0, Ci];
+BB2 = [Ai, B0; BT0, Si];
+BB3 = [IA, -Ai*B; BT0, IC]*[Ai, B0; BT0, Si]*[IA, B0; -BT*Ai, IC];
 
+semilogy(1);
 hold on;
-e1 = sort(abs(qz(AA, BB1))); plot(e1, 'b;1;'); e1(end)/e1(1), drawnow;
-e2 = sort(abs(qz(AA, BB2))); plot(e2, 'r;2;'); e2(end)/e2(1), drawnow;
-e3 = sort(abs(qz(AA, BB3))); plot(e3, 'g;3;'); e3(end)/e3(1), drawnow;
 
-sleep(4);
+s=sort(svd(BB1*AA)); k1=s(end)/s(1), semilogy(s, 'b'), drawnow;
+s=sort(svd(BB2*AA)); k2=s(end)/s(1), semilogy(s, 'r'), drawnow;
+s=sort(svd(BB3*AA)); k3=s(end)/s(1), semilogy(s, 'g'), drawnow;
 """
 
 ofile = open("ofile.m", "w")
 ofile.write(ofile_str)
 ofile.close()
-os.system("octave -q ofile.m")
+success = (0 == os.system("matlab -nodesktop -nosplash -r 'try, ofile, pause(4), end, exit' 2>/dev/null"))
+if not success:
+    os.system("octave -q --eval 'ofile, pause(4)'")
