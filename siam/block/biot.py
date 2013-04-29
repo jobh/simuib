@@ -154,10 +154,22 @@ x0.randomize()
 def run(prec, runs=[0]):
     from time import time
     try:
-        before = time()
-        AAinv = LGMRES(AA, precond=eval(prec)())
-        xx = AAinv(initial_guess=x0, maxiter=20, tolerance=1e-10, show=2)*bb
-        pyplot.semilogy(AAinv.residuals, marker='o', color='bgrkcmy'[runs[0]], label='%s (%.1f)'%(prec,time()-before))
+        t = time()
+        precond = eval(prec)()
+        AAinv = LGMRES(AA, precond=precond)
+        xx = AAinv(initial_guess=x0, maxiter=15, tolerance=1e-10, show=2)*bb
+        t = time()-t
+
+        num_iter = AAinv.iterations
+        residuals = AAinv.residuals
+
+        AAinv = Richardson(AA, precond=precond, iter=1)
+        xx = AAinv(initial_guess=x0, iter=1, show=0)*bb
+        res = AAinv.residuals[1]/AAinv.residuals[0]
+
+        pyplot.semilogy(residuals, marker='o', color='bgrkcmy'[runs[0]],
+                        label='%-21s (#=%2d, e=%.2e, t=%.1f)'%(prec, num_iter, res, t))
+
     except Exception, e:
         print prec, e
     runs[0] += 1
@@ -170,7 +182,7 @@ run('exact_schur')
 run('inexact_schur')
 run('exact_A_inexact_schur')
 
-pyplot.legend()
+pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
 pyplot.show()
 
 print "Finished normally"
