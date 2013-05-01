@@ -12,7 +12,7 @@ from matplotlib import pyplot
 set_log_level(PROGRESS)
 # Function spaces, elements
 
-N=32
+N=20
 mesh = UnitSquareMesh(N,N)
 Nd = mesh.topology().dim()
 
@@ -32,9 +32,8 @@ p = Function(Q)
 
 ### Material parameters
 
-lmbda = Constant(1.0)
-mu    = Constant(1.0)
-lmbda = mu = Constant(1e5)
+lmbda = Constant(1)
+mu    = Constant(1)
 
 class Permeability(Expression):
     def value_shape(self):
@@ -42,20 +41,20 @@ class Permeability(Expression):
     def eval(self, tensor, x):
         tensor.shape = self.value_shape()
         tensor[:] = 0.0
-        if 0.2 < x[1] <= 0.8:
+        if 0.0 <= x[1] < 0.5:
             tensor[0,0] = 1.0
             tensor[1,1] = tensor[0,0]
         else:
-            tensor[0,0] = 1e-6
+            tensor[0,0] = 1e0
             tensor[1,1] = tensor[0,0]
 
-b = Constant(1e-12)
+b = Constant(1e0)
 alpha = Constant(1.0)
 Lambda = Permeability()
 
 t_n = Constant( [0.0]*Nd )
 
-dt = Constant(.02)
+dt = Constant(1)
 T = 0.1
 
 r = Constant(0)
@@ -81,6 +80,7 @@ bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,_: near(x[1],0))
 bc_p_drained_edges  = DirichletBC(Q,  0.0,     lambda x,_: near(x[1],1))
 
 bcs = [bc_u_bedrock, bc_p_drained_edges]
+#bcs = [bc_u_bedrock, None]
 
 # Assemble the matrices and vectors
 
@@ -93,25 +93,24 @@ bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
 def exact_schur():
     Ai = AmesosSolver(A)
     Sp = ML(collapse(C-BT*InvDiag(A)*B))
-    Si = LGMRES(C-BT*Ai*B, precond=Sp, iter=1)
-
+    Si = LGMRES(C-BT*Ai*B, precond=Sp, tolerance=1e-14)
     SS = [[Ai, B],
           [BT, Si]]
     return block_mat(SS).scheme('sgs')
 
-def inexact_schur():
-    Ai = ML(A)
-    Sp = ML(collapse(C-BT*InvDiag(A)*B))
-    SS = [[Ai, B],
-          [BT, Sp]]
-    return block_mat(SS).scheme('tgs')
-
-def exact_A_inexact_schur():
+def exact_A_approx_schur():
     Ai = AmesosSolver(A)
-    Sp = ML(collapse(C-BT*InvDiag(A)*B))
+    Sp = AmesosSolver(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
           [BT, Sp]]
-    return block_mat(SS).scheme('tgs')
+    return block_mat(SS).scheme('sgs')
+
+def exact_C_approx_schur():
+    Ci = AmesosSolver(C)
+    Sp = AmesosSolver(collapse(A-B*InvDiag(C)*BT))
+    SS = [[Sp, B],
+          [BT, Ci]]
+    return block_mat(SS).scheme('sgs', reverse=True)
 
 def drained_split():
     Ai = AmesosSolver(A)
@@ -121,11 +120,12 @@ def drained_split():
     return block_mat(SS).scheme('tgs')
 
 def undrained_split():
+    # Stable
     SA  = collapse(A-1/float(b)*B*BT)
     SAi = AmesosSolver(SA)
     Ci  = AmesosSolver(C)
-    SS  = [[SAi, B],
-           [BT,  Ci]]
+    SS = [[SAi, B],
+          [BT, Ci]]
     return block_mat(SS).scheme('tgs')
 
 def fixed_strain():
@@ -135,17 +135,24 @@ def fixed_strain():
           [BT, Ci]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
-    #SS1 = [[Ai, 0], [0, Ci]]
-    #SS2 = [[1, -B*Ci], [0, 1]]
-    #return block_mat(SS1)*block_mat(SS2)
-
 def fixed_stress():
+    # Stable
     beta = 2*mu + Nd*lmbda
     SC   = collapse(C+Nd/float(beta))
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
-    SS   = [[Ai, B],
-            [BT, SCi]]
+    SS = [[Ai, B],
+          [BT, SCi]]
+    return block_mat(SS).scheme('tgs', reverse=True)
+
+def optimized_fixed_stress():
+    # Stable; Mikelic & Wheeler
+    beta = 2*mu + Nd*lmbda
+    SC   = collapse(C+Nd/float(beta)/2)
+    SCi  = AmesosSolver(SC)
+    Ai   = AmesosSolver(A)
+    SS = [[Ai, B],
+          [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 x0 = AA.create_vec()
@@ -157,18 +164,20 @@ def run(prec, runs=[0]):
         t = time()
         precond = eval(prec)()
         AAinv = LGMRES(AA, precond=precond)
-        xx = AAinv(initial_guess=x0, maxiter=15, tolerance=1e-10, show=2)*bb
+        xx = AAinv(initial_guess=x0, maxiter=10, tolerance=1e-10, show=2)*bb
         t = time()-t
 
         num_iter = AAinv.iterations
         residuals = AAinv.residuals
+        for i in reversed(range(len(residuals))):
+            residuals[i] /= residuals[0]
 
         AAinv = Richardson(AA, precond=precond, iter=1)
         xx = AAinv(initial_guess=x0, iter=1, show=0)*bb
-        res = AAinv.residuals[1]/AAinv.residuals[0]
+        res = AAinv.residuals[-1]/AAinv.residuals[0]
 
-        pyplot.semilogy(residuals, marker='o', color='bgrkcmy'[runs[0]],
-                        label='%-21s (#=%2d, e=%.2e, t=%.1f)'%(prec, num_iter, res, t))
+        pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
+                        label='%-22s (#it=%2d, 1sr=%.2e, t=%.1f)'%(prec, num_iter, res, t))
 
     except Exception, e:
         print prec, e
@@ -177,10 +186,12 @@ def run(prec, runs=[0]):
 run('drained_split')
 run('undrained_split')
 run('fixed_stress')
+run('optimized_fixed_stress')
 run('fixed_strain')
 run('exact_schur')
-run('inexact_schur')
-run('exact_A_inexact_schur')
+#run('inexact_schur')
+run('exact_A_approx_schur')
+run('exact_C_approx_schur')
 
 pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
 pyplot.show()
