@@ -34,6 +34,7 @@ p = Function(Q)
 
 lmbda = Constant(1)
 mu    = Constant(1)
+delta = 1e0
 
 class Permeability(Expression):
     def value_shape(self):
@@ -45,7 +46,7 @@ class Permeability(Expression):
             tensor[0,0] = 1.0
             tensor[1,1] = tensor[0,0]
         else:
-            tensor[0,0] = 1e0
+            tensor[0,0] = delta
             tensor[1,1] = tensor[0,0]
 
 b = Constant(1e0)
@@ -120,8 +121,9 @@ def drained_split():
     return block_mat(SS).scheme('tgs')
 
 def undrained_split():
-    # Stable
-    SA  = collapse(A-1/float(b)*B*BT)
+    # Stable (note sign change)
+    b_inv = diag_op(assemble(-1/b*q*dx))
+    SA  = collapse(A-B*b_inv*BT)
     SAi = AmesosSolver(SA)
     Ci  = AmesosSolver(C)
     SS = [[SAi, B],
@@ -136,9 +138,10 @@ def fixed_strain():
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def fixed_stress():
-    # Stable
+    # Stable (note sign change)
     beta = 2*mu + Nd*lmbda
-    SC   = collapse(C+Nd/float(beta))
+    beta_inv = diag_op(assemble(-1/beta*q*dx))
+    SC   = collapse(C+Nd*beta_inv)
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
     SS = [[Ai, B],
@@ -148,7 +151,8 @@ def fixed_stress():
 def optimized_fixed_stress():
     # Stable; Mikelic & Wheeler
     beta = 2*mu + Nd*lmbda
-    SC   = collapse(C+Nd/float(beta)/2)
+    beta_inv = diag_op(assemble(-1/beta*q*dx))
+    SC   = collapse(C+Nd/2*beta_inv)
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
     SS = [[Ai, B],
@@ -163,23 +167,38 @@ def run(prec, runs=[0]):
     try:
         t = time()
         precond = eval(prec)()
+
+        # GMRES
+
         AAinv = LGMRES(AA, precond=precond)
         xx = AAinv(initial_guess=x0, maxiter=10, tolerance=1e-10, show=2)*bb
         t = time()-t
+
+        # Plot
 
         num_iter = AAinv.iterations
         residuals = AAinv.residuals
         for i in reversed(range(len(residuals))):
             residuals[i] /= residuals[0]
 
-        AAinv = Richardson(AA, precond=precond, iter=1)
-        xx = AAinv(initial_guess=x0, iter=1, show=0)*bb
-        res = AAinv.residuals[-1]/AAinv.residuals[0]
-
+        pyplot.figure(1)
         pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
-                        label='%-22s (#it=%2d, 1sr=%.2e, t=%.1f)'%(prec, num_iter, res, t))
+                        label='%-22s (#it=%2d, t=%.1f)'%(prec, num_iter, t))
+
+        AAinv = Richardson(AA, precond=precond)
+        xx = AAinv(initial_guess=x0, maxiter=10, tolerance=1e-10, show=2)*bb
+
+        num_iter = AAinv.iterations
+        residuals = AAinv.residuals
+        for i in reversed(range(len(residuals))):
+            residuals[i] /= residuals[0]
+
+        pyplot.figure(2)
+        pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
+                        label='%-22s (#it=%2d, 1sr=%.2e)'%(prec, num_iter, residuals[1]))
 
     except Exception, e:
+        raise
         print prec, e
     runs[0] += 1
 
@@ -193,7 +212,14 @@ run('exact_schur')
 run('exact_A_approx_schur')
 run('exact_C_approx_schur')
 
+pyplot.figure(1)
 pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
+pyplot.title('LGMRES')
+
+pyplot.figure(2)
+pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
+pyplot.title('Richardson')
+
 pyplot.show()
 
 print "Finished normally"
