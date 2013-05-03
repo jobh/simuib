@@ -255,7 +255,7 @@ The undrained split is defined as a splitting of the original equations
  while keeping the fluid mass constant over the splitting step, e.g.
 \begin_inset Formula 
 \[
-B^{T}d_{k+1}+bIp^{*}=m^{*}=m_{k}=B^{T}d_{k}+bIp_{k}.
+\nabla\cdot d_{k+1}+bp^{*}=m^{*}=m_{k}=\nabla\cdot d_{k}+bp_{k}.
 \]
 
 \end_inset
@@ -269,10 +269,27 @@ Here
 \end_inset
 
  are the (virtual) pressure and mass after the splitting step.
+ The discrete version reads
+\begin_inset Formula 
+\[
+B^{T}d_{k+1}+M_{b}p*=B^{T}d_{k}+M_{b}p_{k},
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $M_{b}\equiv C-C'$
+\end_inset
+
+ is the appropriate discretization of 
+\begin_inset Formula $b$
+\end_inset
+
+.
  This leads to the mechanical system
 \begin_inset Formula 
 \[
-d_{k+1}=d_{k}-(A-b^{-1}BB^{T})^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}u_{k}-r_{d}\right).
+d_{k+1}=d_{k}-(A-BM_{b}^{-1}B^{T})^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}u_{k}-r_{d}\right).
 \]
 
 \end_inset
@@ -314,7 +331,7 @@ u_{k+1}=u_{k}-\left\{ \begin{bmatrix}\hat{S}_{A}^{-1} & 0\\
 where the expression in curly brackets forms the preconditioner, and
 \begin_inset Formula 
 \[
-\hat{S}_{A}\equiv A-b^{-1}BB^{T}
+\hat{S}_{A}\equiv A-BM_{b}^{-1}B^{T}
 \]
 
 \end_inset
@@ -434,10 +451,35 @@ Here
 \end_inset
 
  is the physical dimension of the problem.
+ After dividing by 
+\begin_inset Formula $\beta,$
+\end_inset
+
+ the discrete version reads
+\begin_inset Formula 
+\[
+B^{T}d^{*}-N_{d}M_{\beta^{-1}}N_{d}p_{k+1}=B^{T}d_{k}-N_{d}M_{\beta^{-1}}p_{k},
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $M_{\beta^{-1}}$
+\end_inset
+
+ is the appropriate discretization of 
+\series bold
+
+\begin_inset Formula $\beta^{-1}$
+\end_inset
+
+.
+
+\series default
  This leads to the fluid system
 \begin_inset Formula 
 \[
-p_{k+1}=p_{k}-(C+\beta^{-1}N_{d}I)^{-1}\left(\begin{bmatrix}B^{T} & C\end{bmatrix}u_{k}-r_{p}\right).
+p_{k+1}=p_{k}-(C+N_{d}M_{\beta^{-1}})^{-1}\left(\begin{bmatrix}B^{T} & C\end{bmatrix}u_{k}-r_{p}\right).
 \]
 
 \end_inset
@@ -504,7 +546,7 @@ where the expression in curly brackets forms the preconditioner, and the
  approximate Schur complement is given by
 \begin_inset Formula 
 \[
-\hat{S}_{C}\equiv C+\beta^{-1}N_{d}I.
+\hat{S}_{C}\equiv C+N_{d}M_{\beta^{-1}}.
 \]
 
 \end_inset

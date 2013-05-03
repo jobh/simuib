@@ -48,17 +48,23 @@ class Permeability(Expression):
         else:
             tensor[0,0] = delta
             tensor[1,1] = tensor[0,0]
-
-b = Constant(1e0)
+b = Constant(1e-6)
 alpha = Constant(1.0)
 Lambda = Permeability()
 
 t_n = Constant( [0.0]*Nd )
 
-dt = Constant(1)
+dt = Constant(0.02)
 T = 0.1
 
 r = Constant(0)
+
+#===== Print some derived quantities ===
+beta = 2*mu + Nd*lmbda
+Kdr = beta/Nd
+nu = lmbda/2/(lmbda+mu)
+tau = alpha**2/Kdr/b
+print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
 
 def sigma(v):
     return 2.0*mu*sym(grad(v)) + lmbda*tr(grad(v))*Identity(Nd)
@@ -77,8 +83,8 @@ L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
 
 # Create boundary conditions.
 
-bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,_: near(x[1],0))
-bc_p_drained_edges  = DirichletBC(Q,  0.0,     lambda x,_: near(x[1],1))
+bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[1] <= 1/N/3)
+bc_p_drained_edges  = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[1] >= 1-1/N/3)
 
 bcs = [bc_u_bedrock, bc_p_drained_edges]
 #bcs = [bc_u_bedrock, None]
@@ -122,9 +128,10 @@ def drained_split():
 
 def undrained_split():
     # Stable (note sign change)
-    b_inv = diag_op(assemble(-1/b*q*dx))
-    SA  = collapse(A-B*b_inv*BT)
-    SAi = AmesosSolver(SA)
+    b_ = assemble(-b*q*phi*dx)
+    b_i = AmesosSolver(b_)
+    SAp = AmesosSolver(A)
+    SAi = ConjGrad(A-B*b_i*BT, precond=SAp, tolerance=1e-14)
     Ci  = AmesosSolver(C)
     SS = [[SAi, B],
           [BT, Ci]]
@@ -139,8 +146,7 @@ def fixed_strain():
 
 def fixed_stress():
     # Stable (note sign change)
-    beta = 2*mu + Nd*lmbda
-    beta_inv = diag_op(assemble(-1/beta*q*dx))
+    beta_inv = assemble(-1/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
@@ -150,8 +156,7 @@ def fixed_stress():
 
 def optimized_fixed_stress():
     # Stable; Mikelic & Wheeler
-    beta = 2*mu + Nd*lmbda
-    beta_inv = diag_op(assemble(-1/beta*q*dx))
+    beta_inv = assemble(-1/beta*q*phi*dx)
     SC   = collapse(C+Nd/2*beta_inv)
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
