@@ -10,17 +10,19 @@ from block.iterative import *
 from matplotlib import pyplot
 
 set_log_level(PROGRESS)
-Krylov = BiCGStab
+
+solvers = [BiCGStab, LGMRES, Richardson]
+#solvers = [Richardson]
 
 # Function spaces, elements
 
-N=20
+N=30
 mesh = UnitSquareMesh(N,N)
 Nd = mesh.topology().dim()
 
 n = FacetNormal(mesh)
 
-V = VectorFunctionSpace(mesh, "CG", 2)
+V = VectorFunctionSpace(mesh, "CG", 1)
 Q = FunctionSpace(mesh, "CG", 1)
 
 v, omega = TestFunction(V), TrialFunction(V)
@@ -29,16 +31,25 @@ q, phi   = TestFunction(Q), TrialFunction(Q)
 u = Function(V)
 p = Function(Q)
 
+if False:
+    # Perturb mesh
+    mv = Function(V)
+    mvv = mv.vector()
+    block_vec([mvv]).randomize()
+    mvv[:] = mvv*(1/3/N)
+    mesh.move(mv)
+    plot(mesh)
+
 #========
 # Define forms, material parameters, boundary conditions, etc.
 
 ### Material parameters
 
-lmbda = Constant(1)
-mu    = Constant(1)
-delta = 1
-dt    = Constant(1)
-b     = Constant(1)
+lmbda = Constant(1e5)
+mu    = Constant(1e5)
+delta = 1e-6
+dt    = Constant(1e-2)
+b     = Constant(1e-10)
 alpha = Constant(1.0)
 
 class Permeability(Expression):
@@ -102,7 +113,7 @@ bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
 def exact_schur():
     Ai = AmesosSolver(A)
     Sp = ML(collapse(C-BT*InvDiag(A)*B))
-    Si = LGMRES(C-BT*Ai*B, precond=Sp, tolerance=1e-14)
+    Si = LGMRES(C-BT*Ai*B, precond=Sp, tolerance=1e-14, maxiter=10)
     SS = [[Ai, B],
           [BT, Si]]
     return block_mat(SS).scheme('sgs')
@@ -130,7 +141,7 @@ def drained_split():
 
 def undrained_split():
     # Stable (note sign change)
-    b_ = assemble(-b*q*phi*dx)
+    b_ = assemble(-b/alpha*q*phi*dx)
     b_i = AmesosSolver(b_)
     #SAp = AmesosSolver(A)
     SAp = AmesosSolver(collapse(A-B*InvDiag(b_)*BT))
@@ -149,7 +160,7 @@ def fixed_strain():
 
 def fixed_stress():
     # Stable (note sign change)
-    beta_inv = assemble(-1/beta*q*phi*dx)
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
@@ -159,7 +170,7 @@ def fixed_stress():
 
 def optimized_fixed_stress():
     # Stable; Mikelic & Wheeler
-    beta_inv = assemble(-1/beta*q*phi*dx)
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd/2*beta_inv)
     SCi  = AmesosSolver(SC)
     Ai   = AmesosSolver(A)
@@ -171,65 +182,51 @@ x0 = AA.create_vec()
 x0.randomize()
 
 def run(prec, runs=[0]):
-    from time import time
     try:
-        t = time()
-        precond = eval(prec)()
+        precond = prec()
 
-        # Krylov solver
+        for solver in solvers:
 
-        AAinv = Krylov(AA, precond=precond)
-        xx = AAinv(initial_guess=x0, maxiter=10, tolerance=1e-10, show=2)*bb
-        t = time()-t
+            # Solve
 
-        # Plot
+            AAinv = solver(AA, precond=precond)
+            xx = AAinv(initial_guess=x0, maxiter=15, tolerance=1e-10, show=2)*bb
 
-        num_iter = AAinv.iterations
-        residuals = AAinv.residuals
-        for i in reversed(range(len(residuals))):
-            residuals[i] /= residuals[0]
+            # Plot
 
-        pyplot.figure(1)
-        pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
-                        label='%-22s (#it=%2d, t=%.1f)'%(prec, num_iter, t))
+            num_iter = AAinv.iterations
+            residuals = AAinv.residuals
+            for j in reversed(range(len(residuals))):
+                residuals[j] /= residuals[0]
 
-        AAinv = Richardson(AA, precond=precond)
-        xx = AAinv(initial_guess=x0, maxiter=10, tolerance=1e-10, show=2)*bb
-
-        num_iter = AAinv.iterations
-        residuals = AAinv.residuals
-        for i in reversed(range(len(residuals))):
-            residuals[i] /= residuals[0]
-
-        pyplot.figure(2)
-        pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
-                        label='%-22s (#it=%2d, 1sr=%.2e)'%(prec, num_iter, residuals[1]))
+            pyplot.figure(solver.__name__)
+            pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
+                            label='%-22s (#it=%2d)'%(prec.__name__, num_iter))
 
     except Exception, e:
         raise
         print prec, e
     runs[0] += 1
 
-run('drained_split')
-run('undrained_split')
-run('fixed_stress')
-run('optimized_fixed_stress')
-run('fixed_strain')
-run('exact_schur')
-#run('inexact_schur')
-run('exact_A_approx_schur')
-run('exact_C_approx_schur')
+run(drained_split)
+run(undrained_split)
+run(fixed_stress)
+run(optimized_fixed_stress)
+run(fixed_strain)
+run(exact_schur)
+#run(inexact_schur)
+run(exact_A_approx_schur)
+run(exact_C_approx_schur)
 
 info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
 
-pyplot.figure(1)
-pyplot.legend(loc='lower left', prop={'family':'monospace', 'size':'x-small'})
-pyplot.title('%s\n%s'%(Krylov.__name__, info))
-
-pyplot.figure(2)
-pyplot.legend(loc='lower left', prop={'family':'monospace', 'size':'x-small'})
-pyplot.title('Richardson\n%s'%info)
-
+for solver in solvers:
+    pyplot.figure(solver.__name__)
+    pyplot.semilogy([1.0]*17, 'k--')
+    pyplot.grid()
+    pyplot.legend(loc='lower left', ncol=2,
+                  prop={'family':'monospace', 'size':'x-small'}).draggable()
+    pyplot.title('%s\n%s'%(solver.__name__, info))
 pyplot.show()
 
 print "Finished normally"
