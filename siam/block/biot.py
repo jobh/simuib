@@ -130,7 +130,8 @@ def undrained_split():
     # Stable (note sign change)
     b_ = assemble(-b*q*phi*dx)
     b_i = AmesosSolver(b_)
-    SAp = AmesosSolver(A)
+    #SAp = AmesosSolver(A)
+    SAp = AmesosSolver(collapse(A-B*InvDiag(b_)*BT))
     SAi = ConjGrad(A-B*b_i*BT, precond=SAp, tolerance=1e-14)
     Ci  = AmesosSolver(C)
     SS = [[SAi, B],
@@ -217,13 +218,15 @@ run('exact_schur')
 run('exact_A_approx_schur')
 run('exact_C_approx_schur')
 
+info = 'd=%.0e b=%.0e K=%.1e\ntau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
+
 pyplot.figure(1)
 pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
-pyplot.title('LGMRES')
+pyplot.title('LGMRES; '+info)
 
 pyplot.figure(2)
 pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
-pyplot.title('Richardson')
+pyplot.title('Richardson; '+info)
 
 pyplot.show()
 

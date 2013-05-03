@@ -458,7 +458,7 @@ Here
  the discrete version reads
 \begin_inset Formula 
 \[
-B^{T}d^{*}-N_{d}M_{\beta^{-1}}N_{d}p_{k+1}=B^{T}d_{k}-N_{d}M_{\beta^{-1}}p_{k},
+B^{T}d^{*}-N_{d}M_{\beta^{-1}}p_{k+1}=B^{T}d_{k}-N_{d}M_{\beta^{-1}}p_{k},
 \]
 
 \end_inset
