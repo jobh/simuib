@@ -179,6 +179,20 @@ r it is sufficient and preferable to approximate it by applying a cheap
 \end_inset
 
 , respectively.
+ Furthermore, we (JBH) have earlier observed that the truncated variant
+\begin_inset Formula 
+\[
+\mathcal{A}^{-1}\approx\begin{bmatrix}A^{-1} & 0\\
+0 & S_{C}^{-1}
+\end{bmatrix}\begin{bmatrix}I & 0\\
+-B^{T}A^{-1} & I
+\end{bmatrix}
+\]
+
+\end_inset
+
+is often equally effective as preconditioner when symmetry is not required
+ (and the Schur complement is approximate).
 \end_layout
 
 \begin_layout Subsection
@@ -208,6 +222,10 @@ d_{k+1}=d_{k}-A^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}u_{k}-r_{d}\right).
 
 \end_inset
 
+
+\end_layout
+
+\begin_layout Standard
 Subsequently, the fluid system is solved normally
 \family roman
 \series medium
@@ -554,6 +572,35 @@ where the expression in curly brackets forms the preconditioner, and the
 This last preconditioner is particularly appealing from a legacy code perspectiv
 e, since the matrix structure of the Schur complement is identical to the
  original matrix.
+\end_layout
+
+\begin_layout Subsubsection
+Optimized fixed stress
+\end_layout
+
+\begin_layout Standard
+According to Mikelić and Wheeler [2012], the contraction properties of the
+ fixed stress method are optimized by setting
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\[
+\hat{S}_{C}\equiv C+\frac{N_{d}}{2}M_{\beta^{-1}}.
+\]
+
+\end_inset
+
+
 \end_layout
 
 \end_body
