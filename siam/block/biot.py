@@ -143,7 +143,6 @@ def undrained_split():
     # Stable (note sign change)
     b_ = assemble(-b/alpha*q*phi*dx)
     b_i = AmesosSolver(b_)
-    #SAp = AmesosSolver(A)
     SAp = AmesosSolver(collapse(A-B*InvDiag(b_)*BT))
     SAi = ConjGrad(A-B*b_i*BT, precond=SAp, tolerance=1e-14)
     Ci  = AmesosSolver(C)
@@ -190,7 +189,7 @@ def run(prec, runs=[0]):
             # Solve
 
             AAinv = solver(AA, precond=precond)
-            xx = AAinv(initial_guess=x0, maxiter=15, tolerance=1e-10, show=2)*bb
+            xx = AAinv(initial_guess=x0, maxiter=20, tolerance=1e-10, show=2)*bb
 
             # Plot
 
@@ -221,8 +220,9 @@ run(exact_C_approx_schur)
 info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
 
 for solver in solvers:
-    pyplot.figure(solver.__name__)
-    pyplot.semilogy([1.0]*17, 'k--')
+    f = pyplot.figure(solver.__name__)
+    x = f.axes[0].get_xaxis().get_data_interval()
+    pyplot.semilogy(x, [1.0, 1.0], 'k--')
     pyplot.grid()
     pyplot.legend(loc='lower left', ncol=2,
                   prop={'family':'monospace', 'size':'x-small'}).draggable()
