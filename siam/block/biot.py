@@ -10,6 +10,8 @@ from block.iterative import *
 from matplotlib import pyplot
 
 set_log_level(PROGRESS)
+Krylov = BiCGStab
+
 # Function spaces, elements
 
 N=20
@@ -34,7 +36,10 @@ p = Function(Q)
 
 lmbda = Constant(1)
 mu    = Constant(1)
-delta = 1e0
+delta = 1
+dt    = Constant(1)
+b     = Constant(1)
+alpha = Constant(1.0)
 
 class Permeability(Expression):
     def value_shape(self):
@@ -48,13 +53,10 @@ class Permeability(Expression):
         else:
             tensor[0,0] = delta
             tensor[1,1] = tensor[0,0]
-b = Constant(1e-6)
-alpha = Constant(1.0)
 Lambda = Permeability()
 
 t_n = Constant( [0.0]*Nd )
 
-dt = Constant(0.02)
 T = 0.1
 
 r = Constant(0)
@@ -174,9 +176,9 @@ def run(prec, runs=[0]):
         t = time()
         precond = eval(prec)()
 
-        # GMRES
+        # Krylov solver
 
-        AAinv = LGMRES(AA, precond=precond)
+        AAinv = Krylov(AA, precond=precond)
         xx = AAinv(initial_guess=x0, maxiter=10, tolerance=1e-10, show=2)*bb
         t = time()-t
 
@@ -218,15 +220,15 @@ run('exact_schur')
 run('exact_A_approx_schur')
 run('exact_C_approx_schur')
 
-info = 'd=%.0e b=%.0e K=%.1e\ntau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
+info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
 
 pyplot.figure(1)
-pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
-pyplot.title('LGMRES; '+info)
+pyplot.legend(loc='lower left', prop={'family':'monospace', 'size':'x-small'})
+pyplot.title('%s\n%s'%(Krylov.__name__, info))
 
 pyplot.figure(2)
-pyplot.legend(prop={'family':'monospace', 'size':'x-small'})
-pyplot.title('Richardson; '+info)
+pyplot.legend(loc='lower left', prop={'family':'monospace', 'size':'x-small'})
+pyplot.title('Richardson\n%s'%info)
 
 pyplot.show()
 
