@@ -1,8 +1,5 @@
 from __future__ import division
 
-import scipy
-import scipy.linalg
-import numpy
 from dolfin import *
 from block import *
 from block.algebraic.trilinos import *
@@ -16,8 +13,9 @@ solvers = [BiCGStab, LGMRES, Richardson]
 
 # Function spaces, elements
 
-N=30
+N=10
 mesh = UnitSquareMesh(N,N)
+#mesh = UnitCubeMesh(N,N,N)
 Nd = mesh.topology().dim()
 
 n = FacetNormal(mesh)
@@ -49,21 +47,20 @@ lmbda = Constant(1e5)
 mu    = Constant(1e5)
 delta = 1e-6
 dt    = Constant(1e-2)
-b     = Constant(1e-10)
+b     = Constant(1e-6)
 alpha = Constant(1.0)
 
 class Permeability(Expression):
     def value_shape(self):
-        return (2,2)
+        return (Nd,Nd)
     def eval(self, tensor, x):
         tensor.shape = self.value_shape()
         tensor[:] = 0.0
-        if 0.0 <= x[1] < 0.5:
-            tensor[0,0] = 1.0
-            tensor[1,1] = tensor[0,0]
-        else:
-            tensor[0,0] = delta
-            tensor[1,1] = tensor[0,0]
+        for d in range(Nd):
+            if 0.0 <= x[-1] < 0.5:
+                tensor[d,d] = 1.0
+            else:
+                tensor[d,d] = delta
 Lambda = Permeability()
 
 t_n = Constant( [0.0]*Nd )
@@ -96,10 +93,10 @@ L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
 
 # Create boundary conditions.
 
-bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[1] <= 1/N/3)
-bc_p_drained_edges  = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[1] >= 1-1/N/3)
+bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[-1] <= 1/N/3)
+bc_p_drained_top    = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[-1] >= 1-1/N/3)
 
-bcs = [bc_u_bedrock, bc_p_drained_edges]
+bcs = [bc_u_bedrock, bc_p_drained_top]
 #bcs = [bc_u_bedrock, None]
 
 # Assemble the matrices and vectors
