@@ -16,12 +16,10 @@ def get_command_line_arguments():
 
 def dump_matrix(filename, name, AA):
     f = open(filename, 'w')
-    AA = AA.array()
-    f.write("%s = sparse(%d,%d);"%(name,AA.shape[0],AA.shape[1]))
-    for (i,j) in zip(*numpy.where(AA)):
-        f.write("%s (%d, %d) = %e;\n " % (name,i+1,j+1,AA[i,j]))
-
-
+    f.write("%s = sparse(%d,%d);"%(name,AA.size(0),AA.size(1)))
+    for i in range(AA.size(0)):
+        for (j,v) in zip(*AA.getrow(i)):
+            f.write("%s (%d, %d) = %e;\n " % (name,i+1,j+1,v))
 
 cl_args = get_command_line_arguments()
 
