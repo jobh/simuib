@@ -6,110 +6,32 @@ from block.algebraic.trilinos import *
 from block.iterative import *
 from matplotlib import pyplot
 
-set_log_level(PROGRESS)
+set_log_level(PROGRESS if MPI.process_number()==0 else ERROR)
 
-solvers = [BiCGStab, LGMRES, Richardson]
-#solvers = [Richardson]
-
-# Function spaces, elements
-
-N=10
-mesh = UnitSquareMesh(N,N)
-#mesh = UnitCubeMesh(N,N,N)
-Nd = mesh.topology().dim()
-
-n = FacetNormal(mesh)
-
-V = VectorFunctionSpace(mesh, "CG", 1)
-Q = FunctionSpace(mesh, "CG", 1)
-
-v, omega = TestFunction(V), TrialFunction(V)
-q, phi   = TestFunction(Q), TrialFunction(Q)
-
-u = Function(V)
-p = Function(Q)
-
-if False:
-    # Perturb mesh
-    mv = Function(V)
-    mvv = mv.vector()
-    block_vec([mvv]).randomize()
-    mvv[:] = mvv*(1/3/N)
-    mesh.move(mv)
-    plot(mesh)
-
-#========
-# Define forms, material parameters, boundary conditions, etc.
-
-### Material parameters
-
-lmbda = Constant(1e5)
-mu    = Constant(1e5)
-delta = 1e-6
-dt    = Constant(1e-2)
-b     = Constant(1e-6)
-alpha = Constant(1.0)
-
-class Permeability(Expression):
-    def value_shape(self):
-        return (Nd,Nd)
-    def eval(self, tensor, x):
-        tensor.shape = self.value_shape()
-        tensor[:] = 0.0
-        for d in range(Nd):
-            if 0.0 <= x[-1] < 0.5:
-                tensor[d,d] = 1.0
-            else:
-                tensor[d,d] = delta
-Lambda = Permeability()
-
-t_n = Constant( [0.0]*Nd )
-
-T = 0.1
-
-r = Constant(0)
-
+from spinal_cord_2d import *
 #===== Print some derived quantities ===
 beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
 nu = lmbda/2/(lmbda+mu)
-tau = alpha**2/Kdr/b
-print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
+tau = alpha**2/Kdr/b if float(b)>0 else float('inf')
+try:
+    print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
+except:
+    pass
 
-def sigma(v):
-    return 2.0*mu*sym(grad(v)) + lmbda*tr(grad(v))*Identity(Nd)
-def v_D(q):
-    return -Lambda*grad(q)
-def coupling(w,r):
-    return - alpha * r * div(w)
-
-a00 = inner(grad(omega), sigma(v)) * dx
-a01 = coupling(omega,q) * dx
-a10 = coupling(v,phi) * dx
-a11 = -(b*phi*q - dt*inner(grad(phi),v_D(q))) * dx
-
-L0 = dot(t_n, omega) * ds
-L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
-
-# Create boundary conditions.
-
-bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[-1] <= 1/N/3)
-bc_p_drained_top    = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[-1] >= 1-1/N/3)
-
-bcs = [bc_u_bedrock, bc_p_drained_top]
-#bcs = [bc_u_bedrock, None]
+#solvers = [BiCGStab, LGMRES, Richardson]
+solvers = [BiCGStab, Richardson]
 
 # Assemble the matrices and vectors
-
-AA, AAns = block_symmetric_assemble([[a00,a10],[a01,a11]], bcs=bcs)
-bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
 
 [[A,  B],
  [BT, C]] = AA
 
+rigid_body_modes(V)
+
 def exact_schur():
     Ai = AmesosSolver(A)
-    Sp = ML(collapse(C-BT*InvDiag(A)*B))
+    Sp = AmesosSolver(collapse(C-BT*InvDiag(A)*B))
     Si = LGMRES(C-BT*Ai*B, precond=Sp, tolerance=1e-14, maxiter=10)
     SS = [[Ai, B],
           [BT, Si]]
@@ -118,6 +40,21 @@ def exact_schur():
 def exact_A_approx_schur():
     Ai = AmesosSolver(A)
     Sp = AmesosSolver(collapse(C-BT*InvDiag(A)*B))
+    SS = [[Ai, B],
+          [BT, Sp]]
+    return block_mat(SS).scheme('sgs')
+
+def inexact_schur():
+    Ai = ML(A, pdes=Nd, nullspace=rigid_body_modes(V))
+    Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
+    SS = [[Ai, B],
+          [BT, Sp]]
+    return block_mat(SS).scheme('tgs')
+
+def exact_A_ml_schur():
+    #Ai = ML(A, nullspace=rigid_body_modes(V))
+    Ai = AmesosSolver(A)
+    Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
           [BT, Sp]]
     return block_mat(SS).scheme('sgs')
@@ -200,7 +137,6 @@ def run(prec, runs=[0]):
                             label='%-22s (#it=%2d)'%(prec.__name__, num_iter))
 
     except Exception, e:
-        raise
         print prec, e
     runs[0] += 1
 
@@ -208,13 +144,16 @@ run(drained_split)
 run(undrained_split)
 run(fixed_stress)
 run(optimized_fixed_stress)
-run(fixed_strain)
+#run(fixed_strain)
 run(exact_schur)
-#run(inexact_schur)
+run(inexact_schur)
 run(exact_A_approx_schur)
-run(exact_C_approx_schur)
+run(exact_A_ml_schur)
 
-info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
+try:
+    info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
+except:
+    info = ''
 
 for solver in solvers:
     f = pyplot.figure(solver.__name__)
@@ -224,6 +163,8 @@ for solver in solvers:
     pyplot.legend(loc='lower left', ncol=2,
                   prop={'family':'monospace', 'size':'x-small'}).draggable()
     pyplot.title('%s\n%s'%(solver.__name__, info))
-pyplot.show()
+if MPI.process_number() == 0:
+    pyplot.show()
+    pass
 
 print "Finished normally"
