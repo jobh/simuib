@@ -1,10 +1,7 @@
 from __future__ import division
 
 from block import *
-from block.iterative import *
-from block.algebraic.trilinos import *
 from dolfin import *
-from block.dolfin_util import *
 import numpy
 
 from scipy.interpolate import splrep, splev

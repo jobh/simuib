@@ -8,7 +8,12 @@ from matplotlib import pyplot
 
 set_log_level(PROGRESS if MPI.process_number()==0 else ERROR)
 
-from spinal_cord_2d import *
+def dx_times(form):
+    return form*dx
+#from simpleproblem import *
+#from spinal_cord_2d import *
+from spinal_cord_3d import *
+
 #===== Print some derived quantities ===
 beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
@@ -27,19 +32,15 @@ solvers = [BiCGStab, Richardson]
 [[A,  B],
  [BT, C]] = AA
 
-rigid_body_modes(V)
-
 def exact_schur():
-    Ai = AmesosSolver(A)
-    Sp = AmesosSolver(collapse(C-BT*InvDiag(A)*B))
-    Si = LGMRES(C-BT*Ai*B, precond=Sp, tolerance=1e-14, maxiter=10)
+    Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
+    Si = BiCGStab(C-BT*Ai*B, precond=Sp, tolerance=1e-14, maxiter=200)
     SS = [[Ai, B],
           [BT, Si]]
     return block_mat(SS).scheme('sgs')
 
 def exact_A_approx_schur():
-    Ai = AmesosSolver(A)
-    Sp = AmesosSolver(collapse(C-BT*InvDiag(A)*B))
+    Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
           [BT, Sp]]
     return block_mat(SS).scheme('sgs')
@@ -48,62 +49,59 @@ def inexact_schur():
     Ai = ML(A, pdes=Nd, nullspace=rigid_body_modes(V))
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
-          [BT, Sp]]
+          [BT, Sp ]]
     return block_mat(SS).scheme('tgs')
 
 def exact_A_ml_schur():
     #Ai = ML(A, nullspace=rigid_body_modes(V))
-    Ai = AmesosSolver(A)
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
           [BT, Sp]]
     return block_mat(SS).scheme('sgs')
 
 def exact_C_approx_schur():
-    Ci = AmesosSolver(C)
-    Sp = AmesosSolver(collapse(A-B*InvDiag(C)*BT))
+    Ci = MumpsSolver(C)
+    Sp = MumpsSolver(collapse(A-B*InvDiag(C)*BT))
     SS = [[Sp, B],
           [BT, Ci]]
     return block_mat(SS).scheme('sgs', reverse=True)
 
 def drained_split():
-    Ai = AmesosSolver(A)
-    Ci = AmesosSolver(C)
+    Ci = MumpsSolver(C)
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
 
 def undrained_split():
     # Stable (note sign change)
-    b_ = assemble(-b/alpha*q*phi*dx)
-    b_i = AmesosSolver(b_)
-    SAp = AmesosSolver(collapse(A-B*InvDiag(b_)*BT))
-    SAi = ConjGrad(A-B*b_i*BT, precond=SAp, tolerance=1e-14)
-    Ci  = AmesosSolver(C)
+    b_ = assemble(dx_times(-b/alpha*q*phi))
+    b_i = MumpsSolver(b_)
+    SAp = MumpsSolver(collapse(A-B*InvDiag(b_)*BT))
+    SAp._deps = [A,B,BT,b_]
+    SAi = ConjGrad(A-B*b_i*BT, precond=SAp, show=1, tolerance=1e-14)
+    Ci  = MumpsSolver(C)
     SS = [[SAi, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
 
 def fixed_strain():
-    Ai = AmesosSolver(A)
-    Ci = AmesosSolver(C)
+    Ci = MumpsSolver(C)
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def fixed_stress():
     # Stable (note sign change)
-    beta_inv = assemble(-alpha/beta*q*phi*dx)
+    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
     SC   = collapse(C+Nd*beta_inv)
-    SCi  = AmesosSolver(SC)
-    Ai   = AmesosSolver(A)
+    SCi  = MumpsSolver(SC)
     SS = [[Ai, B],
           [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def inexact_fixed_stress():
     # Stable (note sign change)
-    beta_inv = assemble(-alpha/beta*q*phi*dx)
+    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
     SC   = collapse(C+Nd*beta_inv)
     SCi  = DD_ILUT(SC)
     Ai   = ML(A, pdes=Nd, nullspace=rigid_body_modes(V))
@@ -113,10 +111,9 @@ def inexact_fixed_stress():
 
 def optimized_fixed_stress():
     # Stable; Mikelic & Wheeler
-    beta_inv = assemble(-alpha/beta*q*phi*dx)
+    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
     SC   = collapse(C+Nd/2*beta_inv)
-    SCi  = AmesosSolver(SC)
-    Ai   = AmesosSolver(A)
+    SCi  = MumpsSolver(SC)
     SS = [[Ai, B],
           [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
@@ -151,16 +148,32 @@ def run(prec, runs=[0]):
         print prec, e
     runs[0] += 1
 
-run(drained_split)
+    try:
+        del precond
+        del AAinv
+    except:
+        pass
+    import gc
+    gc.collect()
+
+
+# Do not use Ai
 run(undrained_split)
+#run(exact_C_approx_schur
+run(inexact_schur)
+run(inexact_fixed_stress)
+
+Ai = MumpsSolver(A)
+
+run(drained_split)
 run(fixed_stress)
 run(optimized_fixed_stress)
 #run(fixed_strain)
 run(exact_schur)
-run(inexact_schur)
-run(inexact_fixed_stress)
 run(exact_A_approx_schur)
 run(exact_A_ml_schur)
+
+del Ai
 
 try:
     info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
@@ -175,6 +188,7 @@ for solver in solvers:
     pyplot.legend(loc='lower left', ncol=2,
                   prop={'family':'monospace', 'size':'x-small'}).draggable()
     pyplot.title('%s\n%s'%(solver.__name__, info))
+
 if MPI.process_number() == 0:
     pyplot.show()
     pass
