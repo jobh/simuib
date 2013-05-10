@@ -101,6 +101,16 @@ def fixed_stress():
           [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
+def inexact_fixed_stress():
+    # Stable (note sign change)
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
+    SC   = collapse(C+Nd*beta_inv)
+    SCi  = DD_ILUT(SC)
+    Ai   = ML(A, pdes=Nd, nullspace=rigid_body_modes(V))
+    SS = [[Ai, B],
+          [BT, SCi]]
+    return block_mat(SS).scheme('tgs', reverse=True)
+
 def optimized_fixed_stress():
     # Stable; Mikelic & Wheeler
     beta_inv = assemble(-alpha/beta*q*phi*dx)
@@ -116,6 +126,7 @@ x0.randomize()
 
 def run(prec, runs=[0]):
     try:
+        print '===', prec.__name__, '==='
         precond = prec()
 
         for solver in solvers:
@@ -147,6 +158,7 @@ run(optimized_fixed_stress)
 #run(fixed_strain)
 run(exact_schur)
 run(inexact_schur)
+run(inexact_fixed_stress)
 run(exact_A_approx_schur)
 run(exact_A_ml_schur)
 
