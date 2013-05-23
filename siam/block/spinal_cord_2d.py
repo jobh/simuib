@@ -6,18 +6,6 @@ import numpy
 
 from scipy.interpolate import splrep, splev
 
-import sys
-
-def get_command_line_arguments():
-    dict = {}
-    if len(sys.argv) == 1: return dict 
-    for a in sys.argv[1:]: 
-        key, value = a.split('=')
-        dict[key] = value
-    return dict
-
-cl_args = get_command_line_arguments()
-
 #number of elements in x-dir -remember should equal the one in creating_parameters.py:
 E_pia = 2.3e6 #Pa 
 if cl_args.has_key("E_pia"):
@@ -129,7 +117,7 @@ def where(x):
         return grey_matter
     elif r < 0.94:
         return white_matter
-    elif r < 1.0:
+    elif r <= 1.0:
         return pia #assumed pia to be 300 micrometer -Elliott 150 micrometer
     else:
         raise RuntimeError()
@@ -191,7 +179,7 @@ def v_D(q):
 def coupling(w,r):
     return - alpha * r * div(w)
 def corr(test, trial):
-    return 1*lmbdamuInv*h**2*inner(grad(test), grad(trial))
+    return 0*lmbdamuInv*h**2*inner(grad(test), grad(trial))
 
 a00 = inner(grad(omega), sigma(v)) * dx
 a01 = coupling(omega,q) * dx

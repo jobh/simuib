@@ -107,9 +107,7 @@ lmbda = E*nu / ((1.0 + nu)*(1.0 - 2.0*nu))
 b = Constant(0)
 alpha = Constant(1.0)
 #Lambda = Constant(1e-5)#Constant( numpy.diag([.02]*(Nd-1)+[.001]) )
-K0 = Constant(1e-2)
-K1 = Constant(1e-6)
-K2 = Constant(1e-5)
+K = [Constant(k) for k in (1e-2, 1e-6, 1e-5)]
 
 t_n = Constant([0.0]*Nd)
 f_n = Constant([0.0]*Nd)
@@ -117,7 +115,7 @@ n = FacetNormal(mesh)
 h = mesh.hmax()
 dt = Constant(.00125)
 T = 0.85#3#0.02
-on = 1
+on = 0
 Q = Constant(0)
 
 class applied_pres(Expression):
@@ -148,7 +146,7 @@ def corr(q):
 a00 = dx_times(inner(grad(omega), sigma(v)))
 a01 = dx_times(coupling(omega,q))
 a10 = dx_times(coupling(v,phi))
-a11 = dx_times(-(b*phi*q - dt*inner(grad(phi),v_D(K0, q)) + on*inner(corr(q), grad(phi))))
+a11 = sum(-(b*phi*q - dt*inner(grad(phi),v_D(K[i], q)) + on*inner(corr(q), grad(phi))) * dx(i) for i in range(3))
 
 L0 = inner(omega, -p0*n)*ds(7)
 L1 =  dx_times(coupling(u_prev,phi) - (Q*dt + b*p_prev)*phi - on*inner(corr(p_prev), grad(phi)))
