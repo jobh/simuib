@@ -26,6 +26,8 @@ if problem == 3:
     execfile('spinal_cord_3d.py')
 elif problem == 1:
     execfile('simpleproblem.py')
+elif problem == 4:
+    execfile('fault.py')
 else:
     execfile('spinal_cord_2d.py')
 
@@ -161,6 +163,8 @@ def run(prec, runs=[0]):
 
         for solver in solvers:
 
+            t = Timer('%s %s'%(solver.__name__, prec.__name__))
+
             # Solve
 
             AAinv = solver(AA, precond=precond)
@@ -177,6 +181,8 @@ def run(prec, runs=[0]):
             pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
                             label='%-22s (#it=%2d)'%(prec.__name__, num_iter))
 
+            del t
+
     except Exception, e:
         print prec, e
     runs[0] += 1
@@ -189,11 +195,31 @@ def run(prec, runs=[0]):
     import gc
     gc.collect()
 
+def run2end(prec):
+    global bb
+    precond = prec()
+
+    # Solve
+
+    AAinv = BiCGStab(AA, precond=precond)
+    pv = p.vector()
+    uv = u.vector()
+    for i in range(1):
+        L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
+
+        xx = AAinv(tolerance=1e-10, show=2)*bb
+        uv[:], pv[:] = xx
+        bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
+
+        # Plot
+        plot(u, key='1', mode='displacement')
+        #plot(p, key='2')
+        plot(tr(sigma(u)), title='tr sigma', key='3', mode='color')
+
+    interactive()
 
 Aml = ML(A, pdes=Nd, nullspace=rbm)
 Ci = MumpsSolver(C)
-
-# These do not use Ai, but do their own inversions.
 
 #run(exact_C_approx_schur
 run(inexact_schur)
@@ -202,6 +228,7 @@ run(inexact_fixed_stress)
 run(inexact_optimized_fixed_stress)
 
 del Aml
+
 Ai = MumpsSolver(A)
 
 run(undrained_split)
@@ -213,6 +240,9 @@ run(exact_schur)
 #run(exact_A_approx_schur)
 #run(exact_A_ml_schur)
 
+run2end(fixed_stress)
+
+del Ci
 del Ai
 
 try:
@@ -234,4 +264,5 @@ if MPI.process_number() == 0:
     pyplot.show()
     pass
 
+list_timings()
 print "Finished normally"
