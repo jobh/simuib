@@ -155,9 +155,6 @@ class K(Expression):
 
 K = K()
 
-b = Constant(0)
-alpha = Constant(1.0)
-
 lmbda = E*nu / ((1.0 + nu)*(1.0 - 2.0*nu))
 mu =  E / (2.0*(1.0 + nu))
 lmbdamu = 4*(lmbda + 2*mu)
@@ -171,6 +168,12 @@ dt = Constant(0.00125)
 T = 0.00125#1
 
 Q = Constant(0)
+
+beta = 2*mu + Nd*lmbda
+Kdr = beta/Nd
+Kf = Constant(2.2e9/upm)
+b = 0.5/Kf + 0.5/Kdr
+alpha = Constant(1.0)
 
 def sigma(v):
     return 2.0*mu*sym(grad(v)) + lmbda*tr(grad(v))*Identity(Nd)

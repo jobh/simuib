@@ -103,8 +103,11 @@ nu = 0.35
 mu    = E / (2.0*(1.0 + nu))
 lmbda = E*nu / ((1.0 + nu)*(1.0 - 2.0*nu))
 
+beta = 2*mu + Nd*lmbda
+Kdr = beta/Nd
+Kf = Constant(2.2e7)
+b = 0.5/Kf + 0.5/Kdr
 
-b = Constant(0)
 alpha = Constant(1.0)
 #Lambda = Constant(1e-5)#Constant( numpy.diag([.02]*(Nd-1)+[.001]) )
 K = [Constant(k) for k in (1e-2, 1e-6, 1e-5)]
