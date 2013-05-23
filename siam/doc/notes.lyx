@@ -6,8 +6,6 @@
 \use_default_options true
 \begin_modules
 theorems-ams
-eqs-within-sections
-figs-within-sections
 \end_modules
 \maintain_unincluded_children false
 \language english
@@ -71,7 +69,7 @@ We look at the discretization of the Biot equations on the form
 
 \begin_layout Standard
 \begin_inset Formula 
-\[
+\begin{equation}
 \mathcal{A}\equiv\begin{bmatrix}A & B\\
 B^{T} & C
 \end{bmatrix}\begin{pmatrix}d\\
@@ -79,7 +77,7 @@ p
 \end{pmatrix}=\begin{pmatrix}r_{d}\\
 r_{p}
 \end{pmatrix}
-\]
+\end{equation}
 
 \end_inset
 
@@ -126,7 +124,7 @@ The inverse of
 
  can be written by means of the Schur complement as either (pressure form)
 \begin_inset Formula 
-\[
+\begin{equation}
 \mathcal{A}^{-1}=\begin{bmatrix}I & -A^{-1}B\\
 0 & I
 \end{bmatrix}\begin{bmatrix}A^{-1} & 0\\
@@ -134,13 +132,13 @@ The inverse of
 \end{bmatrix}\begin{bmatrix}I & 0\\
 -B^{T}A^{-1} & I
 \end{bmatrix},
-\]
+\end{equation}
 
 \end_inset
 
 or on the displacement form
 \begin_inset Formula 
-\[
+\begin{equation}
 \mathcal{A}^{-1}=\begin{bmatrix}I & 0\\
 -C^{-1}B^{T} & I
 \end{bmatrix}\begin{bmatrix}S_{A}^{-1} & 0\\
@@ -148,23 +146,23 @@ or on the displacement form
 \end{bmatrix}\begin{bmatrix}I & -BC^{-1}\\
 0 & I
 \end{bmatrix}.
-\]
+\end{equation}
 
 \end_inset
 
 Here the Schur complements are defined as
 \begin_inset Formula 
-\[
+\begin{equation}
 S_{C}\equiv C-B^{T}A^{-1}B
-\]
+\end{equation}
 
 \end_inset
 
 and
 \begin_inset Formula 
-\[
+\begin{equation}
 S_{A}\equiv A-BC^{-1}B^{T}.
-\]
+\end{equation}
 
 \end_inset
 
@@ -181,18 +179,48 @@ r it is sufficient and preferable to approximate it by applying a cheap
 , respectively.
  Furthermore, we (JBH) have earlier observed that the truncated variant
 \begin_inset Formula 
-\[
+\begin{equation}
 \mathcal{A}^{-1}\approx\begin{bmatrix}A^{-1} & 0\\
 0 & S_{C}^{-1}
 \end{bmatrix}\begin{bmatrix}I & 0\\
 -B^{T}A^{-1} & I
-\end{bmatrix}
-\]
+\end{bmatrix}\label{eq:truncated-schur}
+\end{equation}
 
 \end_inset
 
 is often equally effective as preconditioner when symmetry is not required
- (and the Schur complement is approximate).
+ (and the inverses are approximate).
+\end_layout
+
+\begin_layout Paragraph*
+Note
+\end_layout
+
+\begin_layout Standard
+In 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "eq:truncated-schur"
+
+\end_inset
+
+, and elsewhere, the number of applications of the inverse can be minimized
+ by a further factorization, i.e., 
+\begin_inset Formula 
+\begin{equation}
+\mathcal{A}^{-1}\approx\begin{bmatrix}I & 0\\
+0 & S_{C}^{-1}
+\end{bmatrix}\begin{bmatrix}I & 0\\
+-B^{T} & I
+\end{bmatrix}\begin{bmatrix}A^{-1} & 0\\
+0 & I
+\end{bmatrix}.
+\end{equation}
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Subsection
@@ -222,10 +250,6 @@ d_{k+1}=d_{k}-A^{-1}\left(\begin{bmatrix}A & B\end{bmatrix}u_{k}-r_{d}\right).
 
 \end_inset
 
-
-\end_layout
-
-\begin_layout Standard
 Subsequently, the fluid system is solved normally
 \family roman
 \series medium
@@ -250,18 +274,82 @@ p_{k}
 
 Combining the two steps in matrix form yields
 \begin_inset Formula 
-\[
+\begin{equation}
 u_{k+1}=u_{k}-\left\{ \begin{bmatrix}A^{-1} & 0\\
 0 & C^{-1}
 \end{bmatrix}\begin{bmatrix}I & 0\\
 -B^{T}A^{-1} & I
 \end{bmatrix}\right\} (\mathcal{A}u-r),
-\]
+\end{equation}
 
 \end_inset
 
 where the expression in curly brackets forms the preconditioner.
- We recognize this as a Gauss-Seidel iteration.
+ We recognize this as a truncated Gauss-Seidel iteration.
+\end_layout
+
+\begin_layout Paragraph*
+Note
+\end_layout
+
+\begin_layout Standard
+A normal (full) Gauss iteration can be written explicitly as
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\begin{equation}
+\begin{bmatrix}A^{-1} & 0\\
+0 & C^{-1}
+\end{bmatrix}\begin{bmatrix}I & -B\\
+-B^{T}A^{-1} & I+B^{T}A^{-1}B
+\end{bmatrix},
+\end{equation}
+
+\end_inset
+
+and the symmetric Gauss-Seidel iteration as
+\begin_inset Formula 
+\begin{equation}
+\begin{bmatrix}I & -A^{-1}B\\
+0 & I
+\end{bmatrix}\begin{bmatrix}A^{-1} & 0\\
+0 & C^{-1}
+\end{bmatrix}\begin{bmatrix}I & 0\\
+-B^{T}A^{-1} & I
+\end{bmatrix}.
+\end{equation}
+
+\end_inset
+
+ The truncation discards corrections coming from 
+\begin_inset Quotes eld
+\end_inset
+
+old
+\begin_inset Quotes erd
+\end_inset
+
+ values.
+ Algebraically, it can be seen as dropping the 
+\begin_inset Formula $-B$
+\end_inset
+
+ and 
+\begin_inset Formula $B^{T}A^{-1}B$
+\end_inset
+
+ terms in the full iteration, or as dropping the first factor in the symmetric
+ iteration.
 \end_layout
 
 \begin_layout Subsection
@@ -336,21 +424,21 @@ Combining the two steps in matrix form yields
 \color none
 
 \begin_inset Formula 
-\[
+\begin{equation}
 u_{k+1}=u_{k}-\left\{ \begin{bmatrix}\hat{S}_{A}^{-1} & 0\\
 0 & C^{-1}
 \end{bmatrix}\begin{bmatrix}I & 0\\
 -B^{T}\hat{S}_{A}^{-1} & I
 \end{bmatrix}\right\} (\mathcal{A}u-r),
-\]
+\end{equation}
 
 \end_inset
 
 where the expression in curly brackets forms the preconditioner, and
 \begin_inset Formula 
-\[
+\begin{equation}
 \hat{S}_{A}\equiv A-BM_{b}^{-1}B^{T}
-\]
+\end{equation}
 
 \end_inset
 
@@ -419,13 +507,13 @@ Combining the two steps in matrix form yields
 \color none
 
 \begin_inset Formula 
-\[
+\begin{equation}
 u_{k+1}=u_{k}-\left\{ \begin{bmatrix}A^{-1} & 0\\
 0 & C^{-1}
 \end{bmatrix}\begin{bmatrix}I & -BC^{-1}\\
 0 & I
 \end{bmatrix}\right\} (\mathcal{A}u-r),
-\]
+\end{equation}
 
 \end_inset
 
@@ -550,22 +638,22 @@ Combining the two steps in matrix form yields
 \color none
 
 \begin_inset Formula 
-\[
+\begin{equation}
 u_{k+1}=u_{k}-\left\{ \begin{bmatrix}A^{-1} & 0\\
 0 & \hat{S}_{C}^{-1}
 \end{bmatrix}\begin{bmatrix}I & -B\hat{S}_{C}^{-1}\\
 0 & I
 \end{bmatrix}\right\} (\mathcal{A}u-r),
-\]
+\end{equation}
 
 \end_inset
 
 where the expression in curly brackets forms the preconditioner, and the
  approximate Schur complement is given by
 \begin_inset Formula 
-\[
+\begin{equation}
 \hat{S}_{C}\equiv C+N_{d}M_{\beta^{-1}}.
-\]
+\end{equation}
 
 \end_inset
 
@@ -594,9 +682,9 @@ According to Mikelić and Wheeler [2012], the contraction properties of the
 \color none
 
 \begin_inset Formula 
-\[
+\begin{equation}
 \hat{S}_{C}\equiv C+\frac{N_{d}}{2}M_{\beta^{-1}}.
-\]
+\end{equation}
 
 \end_inset
 
