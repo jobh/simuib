@@ -51,7 +51,8 @@ rbm = rigid_body_modes(V)
 
 def exact_schur():
     Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
-    Si = BiCGStab(C-BT*Ai*B, precond=Sp, tolerance=1e-14, maxiter=200)
+    Si = BiCGStab(C-BT*Ai*B, precond=Sp, tolerance=1e-14,
+                  nonconvergence_is_fatal=True)
     SS = [[Ai, B],
           [BT, Si]]
     return block_mat(SS).scheme('sgs')
@@ -100,7 +101,8 @@ def undrained_split():
         pass
     b_ = assemble(dx_times(-b/alpha*q*phi))
     b_i = MumpsSolver(b_)
-    SAi = ConjGrad(A-B*b_i*BT, precond=Ai, show=1, tolerance=1e-14)
+    SAi = ConjGrad(A-B*b_i*BT, precond=Ai, show=1, tolerance=1e-14,
+                   nonconvergence_is_fatal=True)
     SS = [[SAi, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
@@ -188,6 +190,9 @@ def run(prec, runs=[0]):
     gc.collect()
 
 
+Aml = ML(A, pdes=Nd, nullspace=rbm)
+Ci = MumpsSolver(C)
+
 # These do not use Ai, but do their own inversions.
 
 #run(exact_C_approx_schur
@@ -196,6 +201,7 @@ run(inexact_symm_schur)
 run(inexact_fixed_stress)
 run(inexact_optimized_fixed_stress)
 
+del Aml
 Ai = MumpsSolver(A)
 
 run(undrained_split)
@@ -204,8 +210,8 @@ run(fixed_stress)
 run(optimized_fixed_stress)
 #run(fixed_strain)
 run(exact_schur)
-run(exact_A_approx_schur)
-run(exact_A_ml_schur)
+#run(exact_A_approx_schur)
+#run(exact_A_ml_schur)
 
 del Ai
 
