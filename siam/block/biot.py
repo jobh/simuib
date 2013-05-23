@@ -63,17 +63,15 @@ def exact_A_approx_schur():
     return block_mat(SS).scheme('sgs')
 
 def inexact_schur():
-    Ai = ML(A, pdes=Nd, nullspace=rbm)
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
-    SS = [[Ai, B],
-          [BT, Sp ]]
+    SS = [[Aml, B],
+          [BT,  Sp ]]
     return block_mat(SS).scheme('tgs')
 
 def inexact_symm_schur():
-    Ai = ML(A, pdes=Nd, nullspace=rbm)
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
-    SS = [[Ai, B],
-          [BT, Sp ]]
+    SS = [[Aml, B],
+          [BT,  Sp ]]
     return block_mat(SS).scheme('tgs')
 
 def exact_A_ml_schur():
@@ -83,30 +81,31 @@ def exact_A_ml_schur():
     return block_mat(SS).scheme('sgs')
 
 def exact_C_approx_schur():
-    Ci = MumpsSolver(C)
     Sp = MumpsSolver(collapse(A-B*InvDiag(C)*BT))
     SS = [[Sp, B],
           [BT, Ci]]
     return block_mat(SS).scheme('sgs', reverse=True)
 
 def drained_split():
-    Ci = MumpsSolver(C)
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
 
 def undrained_split():
     # Stable (note sign change)
+    try:
+        if float(b) == 0.0:
+            return
+    except:
+        pass
     b_ = assemble(dx_times(-b/alpha*q*phi))
     b_i = MumpsSolver(b_)
     SAi = ConjGrad(A-B*b_i*BT, precond=Ai, show=1, tolerance=1e-14)
-    Ci  = MumpsSolver(C)
     SS = [[SAi, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
 
 def fixed_strain():
-    Ci = MumpsSolver(C)
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs', reverse=True)
@@ -124,20 +123,18 @@ def inexact_fixed_stress():
     # Stable (note sign change)
     beta_inv = assemble(dx_times(-alpha/beta*q*phi))
     SC   = collapse(C+Nd*beta_inv)
-    SCi  = DD_ILUT(SC)
-    Ai   = ML(A, pdes=Nd, nullspace=rbm)
-    SS = [[Ai, B],
-          [BT, SCi]]
+    SCp  = DD_ILUT(SC)
+    SS = [[Aml, B],
+          [BT, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def inexact_optimized_fixed_stress():
     # Stable (note sign change)
     beta_inv = assemble(dx_times(-alpha/beta*q*phi))
     SC   = collapse(C+Nd/2*beta_inv)
-    SCi  = DD_ILUT(SC)
-    Ai   = ML(A, pdes=Nd, nullspace=rbm)
-    SS = [[Ai, B],
-          [BT, SCi]]
+    SCp  = DD_ILUT(SC)
+    SS = [[Aml, B],
+          [BT, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def optimized_fixed_stress():
@@ -156,13 +153,16 @@ def run(prec, runs=[0]):
     try:
         print '===', prec.__name__, '==='
         precond = prec()
+        if precond is None:
+            print '(skip)'
+            return
 
         for solver in solvers:
 
             # Solve
 
             AAinv = solver(AA, precond=precond)
-            xx = AAinv(initial_guess=x0, maxiter=100, tolerance=1e-10, show=2)*bb
+            xx = AAinv(initial_guess=x0, maxiter=50, tolerance=1e-10, show=2)*bb
 
             # Plot
 
