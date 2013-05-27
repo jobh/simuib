@@ -82,8 +82,8 @@ neuman_boundary.mark(boundary_markers, 1)
 marker_file1 = File("boundary_markers_dolfin.pvd")
 marker_file1 << boundary_markers
 """
-ds = ds[boundary_markers]
-dx = dx[domain_markers]
+ds_subd = ds[boundary_markers]
+dx_subd = dx[domain_markers]
 pmax = 8.0#800 Pa
 v_wave = 200.0 # cm/s (for a period of 1 sec we get wavelength equal wavevelocity
 u0 = Constant([0.0]*Nd)
@@ -91,8 +91,8 @@ u0 = Constant([0.0]*Nd)
 #p0 = Expression("pmax*x[2]", pmax=pmax)
 #p0 = Expression("pmax*sin((2*pi/v_w)*(x[2]+v_w*t))", v_w = v_wave, pmax=pmax, t=0)
 
-def dx_times(form):
-    return form*dx(0)+form*dx(1)+form*dx(2)
+mf0 = MeshFunction('size_t', mesh, 1, 0)
+dx = dolfin.dx[mf0](0)
 
 ### Material parameters
 
@@ -146,13 +146,13 @@ def corr(q):
     return C*grad(q)
 
 
-a00 = dx_times(inner(grad(omega), sigma(v)))
-a01 = dx_times(coupling(omega,q))
-a10 = dx_times(coupling(v,phi))
-a11 = sum(-(b*phi*q - dt*inner(grad(phi),v_D(K[i], q)) + on*inner(corr(q), grad(phi))) * dx(i) for i in range(3))
+a00 = inner(grad(omega), sigma(v)) * dx
+a01 = coupling(omega,q) * dx
+a10 = coupling(v,phi) * dx
+a11 = sum(-(b*phi*q - dt*inner(grad(phi),v_D(K[i], q)) + on*inner(corr(q), grad(phi))) * dx_subd(i) for i in range(3))
 
-L0 = inner(omega, -p0*n)*ds(7)
-L1 =  dx_times(coupling(u_prev,phi) - (Q*dt + b*p_prev)*phi - on*inner(corr(p_prev), grad(phi)))
+L0 = inner(omega, -p0*n)*ds_subd(7)
+L1 =  (coupling(u_prev,phi) - (Q*dt + b*p_prev)*phi - on*inner(corr(p_prev), grad(phi))) * dx
 
 # Create boundary conditions.
 bcu0 = DirichletBC(V, u0, 3)

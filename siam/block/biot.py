@@ -8,9 +8,6 @@ from matplotlib import pyplot
 
 set_log_level(PROGRESS if MPI.process_number()==0 else ERROR)
 
-def dx_times(form):
-    return form*dx
-
 def get_command_line_arguments():
     import sys
     dict = {}
@@ -77,6 +74,12 @@ def inexact_symm_schur():
           [BT,  Sp ]]
     return block_mat(SS).scheme('tgs')
 
+def inexact_gs():
+    Cp = DD_ILUT(C)
+    SS = [[Aml, B],
+          [BT, Cp]]
+    return block_mat(SS).scheme('tgs')
+
 def exact_A_ml_schur():
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
@@ -101,7 +104,7 @@ def undrained_split():
             return
     except:
         pass
-    b_ = assemble(dx_times(-b/alpha*q*phi))
+    b_ = assemble(-b/alpha*q*phi*dx)
     b_i = MumpsSolver(b_)
     SAi = ConjGrad(A-B*b_i*BT, precond=Ai, show=1, tolerance=1e-14,
                    nonconvergence_is_fatal=True)
@@ -116,7 +119,7 @@ def fixed_strain():
 
 def fixed_stress():
     # Stable (note sign change)
-    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
     SCi  = MumpsSolver(SC)
     SS = [[Ai, B],
@@ -125,7 +128,7 @@ def fixed_stress():
 
 def inexact_fixed_stress():
     # Stable (note sign change)
-    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
     SCp  = DD_ILUT(SC)
     SS = [[Aml, B],
@@ -134,7 +137,7 @@ def inexact_fixed_stress():
 
 def inexact_optimized_fixed_stress():
     # Stable (note sign change)
-    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd/2*beta_inv)
     SCp  = DD_ILUT(SC)
     SS = [[Aml, B],
@@ -143,7 +146,7 @@ def inexact_optimized_fixed_stress():
 
 def optimized_fixed_stress():
     # Stable; Mikelic & Wheeler
-    beta_inv = assemble(dx_times(-alpha/beta*q*phi))
+    beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd/2*beta_inv)
     SCi  = MumpsSolver(SC)
     SS = [[Ai, B],
@@ -226,6 +229,7 @@ run(inexact_schur)
 run(inexact_symm_schur)
 run(inexact_fixed_stress)
 run(inexact_optimized_fixed_stress)
+run(inexact_gs)
 
 del Aml
 
@@ -240,7 +244,8 @@ run(exact_schur)
 #run(exact_A_approx_schur)
 #run(exact_A_ml_schur)
 
-run2end(fixed_stress)
+if problem == 4:
+    run2end(fixed_stress)
 
 del Ci
 del Ai
