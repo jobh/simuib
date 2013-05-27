@@ -72,13 +72,24 @@ def inexact_symm_schur():
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Aml, B],
           [BT,  Sp ]]
-    return block_mat(SS).scheme('tgs')
+    return block_mat(SS).scheme('sgs')
 
 def inexact_gs():
     Cp = DD_ILUT(C)
     SS = [[Aml, B],
           [BT, Cp]]
     return block_mat(SS).scheme('tgs')
+
+def inexact_jacobi():
+    Cp = DD_ILUT(C)
+    SS = [[Aml, B],
+          [BT, Cp]]
+    return block_mat(SS).scheme('jac')
+
+def jacobi():
+    SS = [[Ai, B],
+          [BT, Ci]]
+    return block_mat(SS).scheme('jac')
 
 def exact_A_ml_schur():
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
@@ -230,6 +241,7 @@ run(inexact_symm_schur)
 run(inexact_fixed_stress)
 run(inexact_optimized_fixed_stress)
 run(inexact_gs)
+run(inexact_jacobi)
 
 del Aml
 
@@ -243,6 +255,7 @@ run(optimized_fixed_stress)
 run(exact_schur)
 #run(exact_A_approx_schur)
 #run(exact_A_ml_schur)
+run(jacobi)
 
 if problem == 4:
     run2end(fixed_stress)

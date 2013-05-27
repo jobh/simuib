@@ -33,9 +33,9 @@ if False:
 
 ### Material parameters
 
-lmbda = Constant(1e6)
-mu    = Constant(1)
-delta = 1e-10
+lmbda = Constant(1e5)
+mu    = Constant(1e3)
+delta = 1e-12
 dt    = Constant(1e4)
 b     = Constant(1e-10)
 alpha = Constant(1.0)
