@@ -5,7 +5,7 @@ from block import *
 
 # Function spaces, elements
 
-N=10
+N  = int(cl_args.get('N', 10)) # should be even
 mesh = RectangleMesh(-1, -1, 1, 0, N, N//2)
 
 Nd = mesh.topology().dim()

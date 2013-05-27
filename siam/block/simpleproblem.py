@@ -5,10 +5,12 @@ from block import *
 
 # Function spaces, elements
 
-N=10
-mesh = UnitSquareMesh(N,N)
-#mesh = UnitCubeMesh(N,N,N)
-Nd = mesh.topology().dim()
+Nd = int(cl_args.get('dim', 2))
+N  = int(cl_args.get('N', 10))
+if Nd == 2:
+    mesh = UnitSquareMesh(N,N)
+else:
+    mesh = UnitCubeMesh(N,N,N)
 
 V = VectorFunctionSpace(mesh, "CG", 1)
 Q = FunctionSpace(mesh, "CG", 1)

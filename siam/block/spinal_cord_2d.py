@@ -81,7 +81,7 @@ m = 1
 n = 2
 
 # cells per cm
-N = 32 # should be even
+N  = int(cl_args.get('N', 32)) # should be even
 
 # scale to length units
 m *= upm/100; n *= upm/100; N /= upm/100
