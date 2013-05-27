@@ -5,10 +5,8 @@ from block import *
 
 # Function spaces, elements
 
-eps = 1e-3
-r = Rectangle(-1, -1, 1, 1)
-c = Rectangle(-1, -eps, 0, eps)
-mesh = Mesh(r-c, 200)
+N=10
+mesh = RectangleMesh(-1, -1, 1, 0, N, N//2)
 
 Nd = mesh.topology().dim()
 x = mesh.ufl_cell().x
@@ -57,11 +55,13 @@ L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
 
 # Create boundary conditions.
 
-bc_u = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[-1], 1.0))
-bc_p = DirichletBC(Q, -x[0],     lambda x,bdry: bdry)
-bc_p_fault = DirichletBC(Q, 1.0, lambda x,bdry: abs(x[-1]) <= 2*eps and x[0] <= 0.0, method='pointwise')
+bc_u_pt = DirichletBC(V.sub(0), 0.0, lambda x,bdry: near(x[0],1.0) and near(x[1],0.0), method='pointwise')
+bc_u = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[0], 1.0))
+bc_u_mirror = DirichletBC(V.sub(1), 0.0, lambda x,bdry: near(x[1],0.0) and x[0] >= 0)
+bc_p = DirichletBC(Q, -x[0],     lambda x,bdry: bdry and not near(x[1],0.0))
+bc_p_fault = DirichletBC(Q, 1.0, lambda x,bdry: near(x[1],0.0) and x[0] <= 0.0, method='pointwise')
 
-bcs = [bc_u, [bc_p, bc_p_fault]]
+bcs = [[bc_u_pt, bc_u_mirror], [bc_p, bc_p_fault]]
 
 # Assemble the matrices and vectors
 
