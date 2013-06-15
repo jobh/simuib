@@ -45,8 +45,8 @@ except:
     pass
 
 #solvers = [BiCGStab, LGMRES, Richardson]
-solvers = [BiCGStab, Richardson]
-#solvers = [BiCGStab]
+#solvers = [BiCGStab, Richardson]
+solvers = [BiCGStab]
 #solvers = [Richardson]
 #solvers = [LGMRES]
 
@@ -93,26 +93,23 @@ def inexact_gs():
 
 def inexact_jacobi():
     Cp = DD_ILUT(C)
+    #Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Aml, B],
           [BT, Cp]]
     return block_mat(SS).scheme('jac')
+inexact_jacobi.color='y'
 
 def jacobi():
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('jac')
+jacobi.color='y'
 
 def exact_A_ml_schur():
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Ai, B],
           [BT, Sp]]
     return block_mat(SS).scheme('sgs')
-
-def exact_C_approx_schur():
-    Sp = MumpsSolver(collapse(A-B*InvDiag(C)*BT))
-    SS = [[Sp, B],
-          [BT, Ci]]
-    return block_mat(SS).scheme('sgs', reverse=True)
 
 def inexact_drained_split():
     SS = [[Aml, B],
@@ -228,11 +225,17 @@ def run1(prec, runs=[0]):
 
             if test:
                 bb.zero()
+                x0[0] *= 1/x0[0].norm('l2')
+                x0[1] *= 1/x0[1].norm('l2')
 
             # Solve
             res0 = (AA*x0-bb).norm()
             err0U = x0[0].norm('l2')
             err0P = x0[1].norm('l2')
+            res0 = 1.0
+            err0U = 1.0
+            err0P = 1.0
+
             residuals = [(AA*x0-bb).norm()/res0]
             errorsU = [x0[0].norm('l2')/err0U]
             errorsP = [x0[1].norm('l2')/err0P]
@@ -355,14 +358,13 @@ def run2end(prec):
 
 run=run1
 
-Ci = MumpsSolver(C)
 if inexact:
     Aml = ML(A, pdes=Nd, nullspace=rbm)
 
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
-    run(inexact_undrained_split)
-    ##run(inexact_drained_split)
+    ##run(inexact_undrained_split)
+    run(inexact_drained_split)
     run(inexact_fixed_stress)
     ##run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
@@ -374,6 +376,7 @@ if inexact:
 
 else:
     Ai = MumpsSolver(A)
+    Ci = MumpsSolver(C)
 
     run(undrained_split)
     run(drained_split)
@@ -383,14 +386,13 @@ else:
     run(pressure_schur)
     #run(exact_A_approx_schur)
     #run(exact_A_ml_schur)
-    #run(jacobi)
+    run(jacobi)
 
     #if problem == 4:
     #    run2end(fixed_stress)
 
     del Ai
-
-del Ci
+    del Ci
 
 try:
     info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)

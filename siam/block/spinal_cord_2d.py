@@ -128,7 +128,7 @@ def where(x):
 
 class nu(Expression):
     def eval(self, value, x):
-        w = where(x)
+        #w = where(x)
         value[0] = _nu
         #value[0] = 0.25 if where(x)==central_canal else 0.45
         #value[0] = 0.25 if where(x)==central_canal else 0.35

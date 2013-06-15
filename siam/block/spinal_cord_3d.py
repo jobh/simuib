@@ -23,7 +23,7 @@ def read_file(file_name):
     pres_heartbeat *= 1.3332 # convert from mmHg to Pa/100
     print pres_heartbeat
     print len(pres_heartbeat)
-    
+
     tt = numpy.linspace(0, (stop-start), num=(stop-start))
     tt = tt/200.#sampling frequence
     print len(tt)

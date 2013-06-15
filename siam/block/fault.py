@@ -16,8 +16,8 @@ mesh = Mesh(r-c, 0)
 while mesh.num_cells() < N :
     mesh = refine(mesh)
 # refinements: 342-1368-5472-21888
-plot(mesh, title="%d cells"%mesh.num_cells())
-interactive()
+#plot(mesh, title="%d cells"%mesh.num_cells())
+#interactive()
 
 Nd = mesh.topology().dim()
 x = mesh.ufl_cell().x
