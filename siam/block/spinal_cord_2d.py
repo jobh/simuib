@@ -245,7 +245,6 @@ bc_disp_y  = DirichletBC(V.sub(1), 0.0, boundary_zero_y)
 bc_pres_pia  = DirichletBC(W, applied_pres, left_right_boundary)
 bc_pres_caps = DirichletBC(W, applied_pres, top_bottom_boundary)
 
-
 if pia_perm == 1 and caps_perm == 1:
     bcs = [[bc_disp_x, bc_disp_y], [bc_pres_caps, bc_pres_pia]]
 elif pia_perm == 0 and caps_perm == 1:

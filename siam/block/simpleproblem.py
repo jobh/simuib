@@ -35,11 +35,11 @@ if False:
 
 ### Material parameters
 
-lmbda = Constant(1e5)
+lmbda = Constant(1e4)
 mu    = Constant(1e3)
 delta = 1e-12
-dt    = Constant(1e4)
-b     = Constant(1e-10)
+dt    = Constant(1)
+b     = Constant(1e-6)
 alpha = Constant(1.0)
 
 class Permeability(Expression):

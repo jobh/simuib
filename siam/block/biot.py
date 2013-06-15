@@ -5,6 +5,7 @@ from block import *
 from block.algebraic.trilinos import *
 from block.iterative import *
 from matplotlib import pyplot
+import numpy
 
 set_log_level(PROGRESS if MPI.process_number()==0 else ERROR)
 
@@ -28,6 +29,8 @@ elif problem == 4:
 else:
     execfile('spinal_cord_2d.py')
 
+test = int(cl_args.get("test", 0))
+
 #===== Print some derived quantities ===
 beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
@@ -40,6 +43,9 @@ except:
 
 #solvers = [BiCGStab, LGMRES, Richardson]
 solvers = [BiCGStab, Richardson]
+#solvers = [BiCGStab]
+#solvers = [Richardson]
+#solvers = [LGMRES]
 
 rbm = rigid_body_modes(V)
 
@@ -103,6 +109,11 @@ def exact_C_approx_schur():
           [BT, Ci]]
     return block_mat(SS).scheme('sgs', reverse=True)
 
+def inexact_drained_split():
+    SS = [[Aml, B],
+          [BT, DD_ILUT(C)]]
+    return block_mat(SS).scheme('tgs')
+
 def drained_split():
     SS = [[Ai, B],
           [BT, Ci]]
@@ -121,6 +132,21 @@ def undrained_split():
                    nonconvergence_is_fatal=True)
     SS = [[SAi, B],
           [BT, Ci]]
+    return block_mat(SS).scheme('tgs')
+
+def inexact_undrained_split():
+    # Stable (note sign change)
+    try:
+        if float(b) == 0.0:
+            return
+    except:
+        pass
+    b_ = assemble(-b/alpha*q*phi*dx)
+    b_i = InvDiag(b_)
+    SAi = ML(collapse(A-B*b_i*BT))
+
+    SS = [[SAi, B],
+          [BT, DD_ILUT(C)]]
     return block_mat(SS).scheme('tgs')
 
 def fixed_strain():
@@ -167,7 +193,10 @@ def optimized_fixed_stress():
 x0 = AA.create_vec()
 x0.randomize()
 
-def run(prec, runs=[0]):
+print x0[0].size()+x0[1].size()
+x0s = []
+
+def run1(prec, runs=[0]):
     try:
         print '===', prec.__name__, '==='
         precond = prec()
@@ -179,27 +208,90 @@ def run(prec, runs=[0]):
 
             t = Timer('%s %s'%(solver.__name__, prec.__name__))
 
-            # Solve
+            if test:
+                bb.zero()
 
-            AAinv = solver(AA, precond=precond)
-            xx = AAinv(initial_guess=x0, maxiter=50, tolerance=1e-10, show=2)*bb
+            # Solve
+            res0 = (AA*x0-bb).norm()
+            err0U = x0[0].norm('l2')
+            err0P = x0[1].norm('l2')
+            residuals = [(AA*x0-bb).norm()/res0]
+            errorsU = [x0[0].norm('l2')/err0U]
+            errorsP = [x0[1].norm('l2')/err0P]
+            def cb(k, x, r):
+                residuals.append((AA*x-bb).norm()/res0)
+                errorsU.append(x[0].norm('l2')/err0U)
+                errorsP.append(x[1].norm('l2')/err0P)
+            numiter = 10 if solver == LGMRES else 50
+            AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-10)
+
+            if False:
+                try:
+                    AAinv.compute_fixed_iterations(show=3)
+                except Exception, e:
+                    print e
+                finally:
+                    exit()
+
+            xx = AAinv(initial_guess=x0, callback=cb, show=2)*bb
 
             # Plot
 
             num_iter = AAinv.iterations
-            residuals = AAinv.residuals
-            for j in reversed(range(len(residuals))):
-                residuals[j] /= residuals[0]
 
             pyplot.figure(solver.__name__)
             pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
-                            label='%-22s (#it=%2d)'%(prec.__name__, num_iter))
+                            label='%-22s'%(prec.__name__))
+            if test:
+                pyplot.semilogy(errorsU, marker='xo'[runs[0]//7], linestyle='--', color='bgrkcmy'[runs[0]%7])
+                pyplot.semilogy(errorsP, marker='xo'[runs[0]//7], linestyle=':', color='bgrkcmy'[runs[0]%7])
 
             del t
 
     except Exception, e:
         print prec, e
+        raise
     runs[0] += 1
+
+    try:
+        del precond
+        del AAinv
+    except:
+        pass
+    import gc
+    gc.collect()
+
+def run3(prec):
+    if not x0s:
+        for i in range(10):
+            x0s.append(AA.create_vec())
+            x0s[-1].randomize()
+
+    try:
+        print '===', prec.__name__, '==='
+        precond = prec()
+        if precond is None:
+            print '(skip)'
+            return
+
+        solver = BiCGStab
+        num_iter = []
+        for x in x0s:
+            # Solve
+
+            AAinv = solver(AA, precond=precond)
+            xx = AAinv(initial_guess=x, maxiter=100, tolerance=-1e-8, show=2)*bb
+
+            # Plot
+
+            num_iter.append(AAinv.iterations)
+
+        print 'X %s %.1f %d'%(prec.__name__,
+                              numpy.mean(num_iter),
+                              numpy.max(num_iter))
+
+    except Exception, e:
+        print prec, e
 
     try:
         del precond
@@ -227,60 +319,76 @@ def run2end(prec):
 
         # Plot
         plot(u, key='1', mode='displacement')
-        #plot(p, key='2')
-        plot(tr(sigma(u)), title='tr sigma', key='3', mode='color')
+        plot(p, key='2', mode='color')
+        #plot(tr(sigma(u)), title='tr sigma', key='3', mode='color')
 
     interactive()
 
-Aml = ML(A, pdes=Nd, nullspace=rbm)
+run=run1
+
 Ci = MumpsSolver(C)
+if False:
+    Aml = ML(A, pdes=Nd, nullspace=rbm)
 
-#run(exact_C_approx_schur
-run(inexact_schur)
-run(inexact_symm_schur)
-run(inexact_fixed_stress)
-run(inexact_optimized_fixed_stress)
-run(inexact_gs)
-run(inexact_jacobi)
+    #run(exact_C_approx_schur
+    #run(inexact_schur)
+    #run(inexact_symm_schur)
+    run(inexact_undrained_split)
+    run(inexact_drained_split)
+    run(inexact_fixed_stress)
+    #run(inexact_optimized_fixed_stress)
+    #run(inexact_gs)
+    #run(inexact_jacobi)
 
-del Aml
+    del Aml
 
-Ai = MumpsSolver(A)
+if True:
+    Ai = MumpsSolver(A)
 
-run(undrained_split)
-run(drained_split)
-run(fixed_stress)
-run(optimized_fixed_stress)
-#run(fixed_strain)
-run(exact_schur)
-#run(exact_A_approx_schur)
-#run(exact_A_ml_schur)
-run(jacobi)
+    run(undrained_split)
+    run(drained_split)
+    run(fixed_stress)
+    #run(optimized_fixed_stress)
+    run(fixed_strain)
+    #run(exact_schur)
+    #run(exact_A_approx_schur)
+    #run(exact_A_ml_schur)
+    #run(jacobi)
 
-if problem == 4:
-    run2end(fixed_stress)
+    #if problem == 4:
+    #    run2end(fixed_stress)
+
+    del Ai
 
 del Ci
-del Ai
 
 try:
     info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
 except:
     info = ''
 
-for solver in solvers:
-    f = pyplot.figure(solver.__name__)
-    pyplot.ylim(1e-14,1e6)
-    #x = f.axes[0].get_xaxis().get_data_interval()
-    #pyplot.semilogy(x, [1.0, 1.0], 'k--')
-    pyplot.grid()
-    pyplot.legend(loc='upper right', ncol=2,
-                  prop={'family':'monospace', 'size':'x-small'}).draggable()
-    pyplot.title('%s\n%s'%(solver.__name__, info))
+try:
+    for solver in solvers:
+        f = pyplot.figure(solver.__name__)
+        pyplot.ylim(1e-14,1e6)
+        #x = f.axes[0].get_xaxis().get_data_interval()
+        #pyplot.semilogy(x, [1.0, 1.0], 'k--')
+        pyplot.grid()
+        pyplot.xlabel('Iterations')
+        pyplot.ylabel('Residual')
+        pyplot.legend(loc='upper right', ncol=2,
+                      prop={'family':'monospace', 'size':'x-small'}).draggable()
+        pyplot.title('%s\n%s'%(solver.__name__, info))
 
-if MPI.process_number() == 0:
-    pyplot.show()
+    if MPI.process_number() == 0:
+        for solver in solvers:
+            f = pyplot.figure(solver.__name__)
+            pyplot.savefig(solver.__name__+'.pdf')
+        #pyplot.show()
+        pass
+
+    list_timings()
+except:
     pass
 
-list_timings()
 print "Finished normally"

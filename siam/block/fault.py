@@ -5,10 +5,12 @@ from block import *
 
 # Function spaces, elements
 
-eps = 1e-3
+X0 = 0.0
+
+eps = 3e-3
 r = Rectangle(-1, -1, 1, 1)
-c = Rectangle(-1, -eps, 0, eps)
-mesh = Mesh(r-c, 200)
+c = Rectangle(-1, -eps, X0, eps)
+mesh = Mesh(r-c, 400)
 
 Nd = mesh.topology().dim()
 x = mesh.ufl_cell().x
@@ -57,9 +59,13 @@ L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
 
 # Create boundary conditions.
 
-bc_u = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[-1], 1.0))
-bc_p = DirichletBC(Q, -x[0],     lambda x,bdry: bdry)
-bc_p_fault = DirichletBC(Q, 1.0, lambda x,bdry: abs(x[-1]) <= 2*eps and x[0] <= 0.0, method='pointwise')
+bc_u = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[0], 1.0))
+bc_u1 = DirichletBC(V.sub(0), 0.0,  lambda x,bdry: near(x[0], 1.0))
+bc_u2 = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[0], 1.0) and abs(x[1]) <=2*eps, method='pointwise')
+bc_u = [bc_u1, bc_u2]
+
+bc_p = DirichletBC(Q, -x[0],     lambda x,bdry: bdry and abs(x[1]) > 2*eps)
+bc_p_fault = DirichletBC(Q, 1.0, lambda x,bdry: abs(x[-1]) <= 2*eps and x[0] <= X0, method='pointwise')
 
 bcs = [bc_u, [bc_p, bc_p_fault]]
 
