@@ -98,6 +98,8 @@ q, phi   = TrialFunction(W), TestFunction(W)
 
 u_prev = Function(V)
 p_prev = Function(W)
+u = Function(V)
+p = Function(W)
 
 
 #========
@@ -154,6 +156,11 @@ class K(Expression):
             value[0] = K_pia*scale/mu_w
 
 K = K()
+#P0 = FunctionSpace(mesh, "CG", 1)
+#class W(Expression):
+#    def eval(self, value, x):
+#        value[0] = where(x)
+#plot(project(W(),P0),mode='color',interactive=True)
 
 lmbda = E*nu / ((1.0 + nu)*(1.0 - 2.0*nu))
 mu =  E / (2.0*(1.0 + nu))
@@ -163,9 +170,9 @@ h = mesh.hmax()
 t_n = Constant([0.0]*Nd)
 f_n = Constant([0.0]*Nd)
 
-#dt = Constant(.005)
-dt = Constant(0.00125)
-T = 0.00125#1
+dt = Constant(.5)
+#dt = Constant(0.00125)
+T = 1
 
 Q = Constant(0)
 
@@ -182,7 +189,7 @@ def v_D(q):
 def coupling(w,r):
     return - alpha * r * div(w)
 def corr(test, trial):
-    return 0*lmbdamuInv*h**2*inner(grad(test), grad(trial))
+    return 1*lmbdamuInv*h**2*inner(grad(test), grad(trial))
 
 a00 = inner(grad(omega), sigma(v)) * dx
 a01 = coupling(omega,q) * dx
@@ -259,7 +266,7 @@ elif pia_perm == 0 and caps_perm == 0:
 #h = mesh.hmin()
 # Assemble the matrices and vectors
 
-AA = block_assemble([[a00, a01],
-                     [a10, a11]], bcs=bcs)
+AA,AAns = block_symmetric_assemble([[a00, a01],
+                                    [a10, a11]], bcs=bcs)
 
-bb = block_assemble([L0, L1], bcs=bcs)
+bb = block_assemble([L0, L1], symmetric_mod=AAns, bcs=bcs)

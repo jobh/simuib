@@ -7,10 +7,17 @@ from block import *
 
 X0 = 0.0
 
+N = int(cl_args.get('N', 10))
+
 eps = 3e-3
 r = Rectangle(-1, -1, 1, 1)
 c = Rectangle(-1, -eps, X0, eps)
-mesh = Mesh(r-c, 400)
+mesh = Mesh(r-c, 0)
+while mesh.num_cells() < N :
+    mesh = refine(mesh)
+# refinements: 342-1368-5472-21888
+plot(mesh, title="%d cells"%mesh.num_cells())
+interactive()
 
 Nd = mesh.topology().dim()
 x = mesh.ufl_cell().x
@@ -73,4 +80,3 @@ bcs = [bc_u, [bc_p, bc_p_fault]]
 
 AA, AAns = block_symmetric_assemble([[a00,a10],[a01,a11]], bcs=bcs)
 bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
-

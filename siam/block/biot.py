@@ -29,7 +29,10 @@ elif problem == 4:
 else:
     execfile('spinal_cord_2d.py')
 
-test = int(cl_args.get("test", 0))
+plot_error = int(cl_args.get("plot_error", 0))
+test = plot_error or int(cl_args.get("test", 0))
+justsave = int(cl_args.get("justsave", 0))
+inexact = int(cl_args.get("inexact", 0))
 
 #===== Print some derived quantities ===
 beta = 2*mu + Nd*lmbda
@@ -54,13 +57,14 @@ rbm = rigid_body_modes(V)
 [[A,  B],
  [BT, C]] = AA
 
-def exact_schur():
+def pressure_schur():
     Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
-    Si = BiCGStab(C-BT*Ai*B, precond=Sp, tolerance=1e-14,
+    Si = BiCGStab(C-B.T*Ai*B, precond=Sp, tolerance=1e-14,
                   nonconvergence_is_fatal=True)
     SS = [[Ai, B],
           [BT, Si]]
-    return block_mat(SS).scheme('sgs')
+    return block_mat(SS).scheme('tgs', reverse=True)
+pressure_schur.color = 'c'
 
 def exact_A_approx_schur():
     Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
@@ -68,11 +72,12 @@ def exact_A_approx_schur():
           [BT, Sp]]
     return block_mat(SS).scheme('sgs')
 
-def inexact_schur():
+def inexact_pressure_schur():
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
     SS = [[Aml, B],
           [BT,  Sp ]]
-    return block_mat(SS).scheme('tgs')
+    return block_mat(SS).scheme('tgs', reverse=True)
+inexact_pressure_schur.color = 'c'
 
 def inexact_symm_schur():
     Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
@@ -113,11 +118,13 @@ def inexact_drained_split():
     SS = [[Aml, B],
           [BT, DD_ILUT(C)]]
     return block_mat(SS).scheme('tgs')
+inexact_drained_split.color = 'g'
 
 def drained_split():
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
+drained_split.color = 'g'
 
 def undrained_split():
     # Stable (note sign change)
@@ -133,6 +140,7 @@ def undrained_split():
     SS = [[SAi, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs')
+undrained_split.color = 'b'
 
 def inexact_undrained_split():
     # Stable (note sign change)
@@ -148,11 +156,19 @@ def inexact_undrained_split():
     SS = [[SAi, B],
           [BT, DD_ILUT(C)]]
     return block_mat(SS).scheme('tgs')
+inexact_undrained_split.color = 'b'
 
 def fixed_strain():
     SS = [[Ai, B],
           [BT, Ci]]
     return block_mat(SS).scheme('tgs', reverse=True)
+fixed_strain.color = 'k'
+
+def inexact_fixed_strain():
+    SS = [[Aml, B],
+          [BT, DD_ILUT(C)]]
+    return block_mat(SS).scheme('tgs', reverse=True)
+inexact_fixed_strain.color = 'k'
 
 def fixed_stress():
     # Stable (note sign change)
@@ -162,6 +178,7 @@ def fixed_stress():
     SS = [[Ai, B],
           [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
+fixed_stress.color='r'
 
 def inexact_fixed_stress():
     # Stable (note sign change)
@@ -171,6 +188,7 @@ def inexact_fixed_stress():
     SS = [[Aml, B],
           [BT, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
+inexact_fixed_stress.color='r'
 
 def inexact_optimized_fixed_stress():
     # Stable (note sign change)
@@ -218,10 +236,24 @@ def run1(prec, runs=[0]):
             residuals = [(AA*x0-bb).norm()/res0]
             errorsU = [x0[0].norm('l2')/err0U]
             errorsP = [x0[1].norm('l2')/err0P]
+            if plot_error:
+                pv = p.vector()
+                uv = u.vector()
+                uv[:] = numpy.abs(x0[0])/err0U
+                pv[:] = numpy.abs(x0[1])/err0P
+                plot(u, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
+                plot(p, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
+                interactive(True)
             def cb(k, x, r):
                 residuals.append((AA*x-bb).norm()/res0)
                 errorsU.append(x[0].norm('l2')/err0U)
                 errorsP.append(x[1].norm('l2')/err0P)
+                if plot_error:
+                    uv[:] = numpy.abs(x[0])/err0U
+                    pv[:] = numpy.abs(x[1])/err0P
+                    plot(u, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
+                    plot(p, mode='color')
+                    interactive()
             numiter = 10 if solver == LGMRES else 50
             AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-10)
 
@@ -240,11 +272,11 @@ def run1(prec, runs=[0]):
             num_iter = AAinv.iterations
 
             pyplot.figure(solver.__name__)
-            pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color='bgrkcmy'[runs[0]%7],
+            pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color=prec.color,
                             label='%-22s'%(prec.__name__))
             if test:
-                pyplot.semilogy(errorsU, marker='xo'[runs[0]//7], linestyle='--', color='bgrkcmy'[runs[0]%7])
-                pyplot.semilogy(errorsP, marker='xo'[runs[0]//7], linestyle=':', color='bgrkcmy'[runs[0]%7])
+                pyplot.semilogy(errorsU, linestyle='--', color=prec.color)
+                pyplot.semilogy(errorsP, linestyle=':', color=prec.color)
 
             del t
 
@@ -311,11 +343,8 @@ def run2end(prec):
     pv = p.vector()
     uv = u.vector()
     for i in range(1):
-        L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
-
         xx = AAinv(tolerance=1e-10, show=2)*bb
         uv[:], pv[:] = xx
-        bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
 
         # Plot
         plot(u, key='1', mode='displacement')
@@ -327,30 +356,31 @@ def run2end(prec):
 run=run1
 
 Ci = MumpsSolver(C)
-if False:
+if inexact:
     Aml = ML(A, pdes=Nd, nullspace=rbm)
 
     #run(exact_C_approx_schur
-    #run(inexact_schur)
     #run(inexact_symm_schur)
     run(inexact_undrained_split)
-    run(inexact_drained_split)
+    ##run(inexact_drained_split)
     run(inexact_fixed_stress)
+    ##run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
+    run(inexact_pressure_schur)
     #run(inexact_gs)
     #run(inexact_jacobi)
 
     del Aml
 
-if True:
+else:
     Ai = MumpsSolver(A)
 
     run(undrained_split)
     run(drained_split)
     run(fixed_stress)
-    #run(optimized_fixed_stress)
     run(fixed_strain)
-    #run(exact_schur)
+    #run(optimized_fixed_stress)
+    run(pressure_schur)
     #run(exact_A_approx_schur)
     #run(exact_A_ml_schur)
     #run(jacobi)
@@ -384,7 +414,8 @@ try:
         for solver in solvers:
             f = pyplot.figure(solver.__name__)
             pyplot.savefig(solver.__name__+'.pdf')
-        #pyplot.show()
+        if not justsave:
+            pyplot.show()
         pass
 
     list_timings()
