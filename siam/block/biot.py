@@ -45,8 +45,8 @@ except:
     pass
 
 #solvers = [BiCGStab, LGMRES, Richardson]
-#solvers = [BiCGStab, Richardson]
-solvers = [BiCGStab]
+solvers = [BiCGStab, Richardson]
+#solvers = [BiCGStab]
 #solvers = [Richardson]
 #solvers = [LGMRES]
 
@@ -80,10 +80,11 @@ def inexact_pressure_schur():
 inexact_pressure_schur.color = 'c'
 
 def inexact_symm_schur():
-    Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
-    SS = [[Aml, B],
-          [BT,  Sp ]]
+    Sp = ML(collapse(C-BT*InvDiag(A)*B))
+    SS = [[Aml, 0],
+          [0,  Sp]]
     return block_mat(SS).scheme('sgs')
+inexact_symm_schur.color='k'
 
 def inexact_gs():
     Cp = DD_ILUT(C)
@@ -232,9 +233,9 @@ def run1(prec, runs=[0]):
             res0 = (AA*x0-bb).norm()
             err0U = x0[0].norm('l2')
             err0P = x0[1].norm('l2')
-            res0 = 1.0
-            err0U = 1.0
-            err0P = 1.0
+            #res0 = 1.0
+            #err0U = 1.0
+            #err0P = 1.0
 
             residuals = [(AA*x0-bb).norm()/res0]
             errorsU = [x0[0].norm('l2')/err0U]
@@ -363,14 +364,14 @@ if inexact:
 
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
-    ##run(inexact_undrained_split)
+    run(inexact_undrained_split)
     run(inexact_drained_split)
     run(inexact_fixed_stress)
-    ##run(inexact_fixed_strain)
+    run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
     run(inexact_pressure_schur)
     #run(inexact_gs)
-    #run(inexact_jacobi)
+    run(inexact_jacobi)
 
     del Aml
 

@@ -39,7 +39,7 @@ lmbda = Constant(1e4)
 mu    = Constant(1e3)
 delta = 1e-12
 dt    = Constant(1)
-b     = Constant(1e-6)
+b     = Constant(1e-12)
 alpha = Constant(1.0)
 
 class Permeability(Expression):
