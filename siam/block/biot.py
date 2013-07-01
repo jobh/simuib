@@ -20,14 +20,18 @@ def get_command_line_arguments():
 
 cl_args = get_command_line_arguments()
 problem = int(cl_args.get('problem', 2))
-if problem == 3:
-    execfile('spinal_cord_3d.py')
-elif problem == 1:
+if problem == 1:
     execfile('simpleproblem.py')
+elif problem == 2:
+    execfile('spinal_cord_2d.py')
+elif problem == 3:
+    execfile('spinal_cord_3d.py')
 elif problem == 4:
     execfile('fault.py')
+elif problem == 5:
+    execfile('voring-small.py')
 else:
-    execfile('spinal_cord_2d.py')
+    raise RuntimeError("unknown problem")
 
 plot_error = int(cl_args.get("plot_error", 0))
 test = plot_error or int(cl_args.get("test", 0))
@@ -57,8 +61,6 @@ solvers = [BiCGStab, Richardson]
 #solvers = [BiCGStab]
 #solvers = [Richardson]
 #solvers = [LGMRES]
-
-rbm = rigid_body_modes(V)
 
 # Assemble the matrices and vectors
 
@@ -368,6 +370,7 @@ def run2end(prec):
 run=run1
 
 if inexact:
+    rbm = rigid_body_modes(V)
     Aml = ML(A, pdes=Nd, nullspace=rbm)
 
     #run(exact_C_approx_schur
