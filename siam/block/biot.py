@@ -39,6 +39,14 @@ beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
 nu = lmbda/2/(lmbda+mu)
 try:
+    print 'nu = %g'%float(nu)
+    E = mu/nu* ((1.0 + nu)*(1.0 - 2.0*nu))
+    print 'E =%g'%float(E)
+    print 'Kdr =%g'%float(Kdr)
+    exit()
+except:
+    pass
+try:
     tau = alpha**2/Kdr/b if float(b)>0 else float('inf')
     print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
 except:
@@ -367,11 +375,11 @@ if inexact:
     run(inexact_undrained_split)
     run(inexact_drained_split)
     run(inexact_fixed_stress)
-    run(inexact_fixed_strain)
+    #run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
     run(inexact_pressure_schur)
     #run(inexact_gs)
-    run(inexact_jacobi)
+    #run(inexact_jacobi)
 
     del Aml
 
@@ -382,12 +390,12 @@ else:
     run(undrained_split)
     run(drained_split)
     run(fixed_stress)
-    run(fixed_strain)
+    #run(fixed_strain)
     #run(optimized_fixed_stress)
     run(pressure_schur)
     #run(exact_A_approx_schur)
     #run(exact_A_ml_schur)
-    run(jacobi)
+    #run(jacobi)
 
     #if problem == 4:
     #    run2end(fixed_stress)

@@ -37,9 +37,9 @@ if False:
 
 lmbda = Constant(1e4)
 mu    = Constant(1e3)
-delta = 1e-12
+delta = 1e-8
 dt    = Constant(1)
-b     = Constant(1e-12)
+b     = Constant(1e-6)
 alpha = Constant(1.0)
 
 class Permeability(Expression):
@@ -49,11 +49,12 @@ class Permeability(Expression):
         tensor.shape = self.value_shape()
         tensor[:] = 0.0
         for d in range(Nd):
-            if 0.0 <= x[-1] < 0.5:
+            if 0.0 <= x[-1] < 0.499:
                 tensor[d,d] = 1.0
             else:
                 tensor[d,d] = delta
 Lambda = Permeability()
+plot(mesh, interactive=True)
 
 t_n = Constant( [0.0]*Nd )
 
@@ -82,7 +83,7 @@ bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[-1] <= 
 bc_p_drained_top    = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[-1] >= 1-1/N/3)
 
 bcs = [bc_u_bedrock, bc_p_drained_top]
-#bcs = [bc_u_bedrock, None]
+bcs = [bc_u_bedrock, None]
 
 # Assemble the matrices and vectors
 
