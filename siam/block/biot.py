@@ -264,6 +264,30 @@ def inexact_homogeneous():
     return SS.scheme('tgs')
 inexact_homogeneous.color = 'y'
 
+def homogeneous_pressure_schur():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Ai = MumpsSolver(Ahom)
+    Sp = MumpsSolver(collapse(Chom-Bhom.T*InvDiag(Ahom)*Bhom))
+    Si = BiCGStab(Chom-Bhom.T*Ai*Bhom, precond=Sp, tolerance=1e-14,
+                  nonconvergence_is_fatal=True)
+    SS = [[Ai, Bhom],
+          [Bhom.T, Si]]
+    return block_mat(SS).scheme('tgs', reverse=True)
+homogeneous_pressure_schur.color = 'g'
+
+def inexact_homogeneous_pressure_schur():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Sinv = MumpsSolver(collapse(Chom-Bhom.T*InvDiag(Ahom)*Bhom))
+    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
+    SS = block_mat([[Ainv, Bhom],
+                    [Bhom.T, Sinv]])
+    return SS.scheme('tgs')
+inexact_homogeneous_pressure_schur.color = 'g'
+
 #==================
 
 x0 = AA.create_vec()
@@ -437,6 +461,7 @@ if inexact:
     #run(inexact_gs)
     #run(inexact_jacobi)
     run(inexact_homogeneous)
+    run(inexact_homogeneous_pressure_schur)
 
     del Aml
 
@@ -454,6 +479,7 @@ else:
     #run(exact_A_ml_schur)
     #run(jacobi)
     run(homogeneous)
+    run(homogeneous_pressure_schur)
 
     #if problem == 4:
     #    run2end(fixed_stress)
