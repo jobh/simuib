@@ -216,6 +216,56 @@ def optimized_fixed_stress():
           [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
+def create_homogeneous():
+    # Note: Probably only works with problem=2 (and maybe 3)
+    area = assemble(Constant(1)*dx, mesh=mesh)
+    mu_avg = assemble(mu*dx, mesh=mesh)/area
+    lmbda_avg = assemble(lmbda*dx, mesh=mesh)/area
+    K_avg = assemble(K*dx, mesh=mesh)/area
+    b_avg = assemble(b*dx, mesh=mesh)/area
+    lmbdamuInv_avg = assemble(lmbdamuInv*dx, mesh=mesh)/area
+
+    def sigma(v):
+        return 2.0*mu_avg*sym(grad(v)) + lmbda_avg*tr(grad(v))*Identity(Nd)
+    def v_D(q):
+        return -K_avg*grad(q)
+    def coupling(w,r):
+        return - alpha * r * div(w)
+    def corr(test, trial):
+        return 1*lmbdamuInv_avg*h**2*inner(grad(test), grad(trial))
+
+    a00 = inner(grad(omega), sigma(v)) * dx
+    a01 = coupling(omega,q) * dx
+    a10 = coupling(v,phi) * dx
+    a11 = -(b_avg*phi*q - dt*inner(grad(phi),v_D(q))) * dx - corr(phi, q)*dx
+
+    AAhom, _ = block_symmetric_assemble([[a00, a01], [a10, a11]], bcs=bcs)
+    return AAhom
+
+def homogeneous():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Ainv = MumpsSolver(Ahom)
+    Cinv = MumpsSolver(Chom)
+    SS = block_mat([[Ainv, Bhom],
+                    [Bhom.T, Cinv]])
+    return SS.scheme('tgs')
+homogeneous.color = 'y'
+
+def inexact_homogeneous():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
+    Cinv = DD_ILUT(Chom)
+    SS = block_mat([[Ainv, Bhom],
+                    [Bhom.T, Cinv]])
+    return SS.scheme('tgs')
+inexact_homogeneous.color = 'y'
+
+#==================
+
 x0 = AA.create_vec()
 x0.randomize()
 
@@ -268,7 +318,10 @@ def run1(prec, runs=[0]):
                     plot(u, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
                     plot(p, mode='color')
                     interactive()
-            numiter = 20 if solver == LGMRES else 150
+            numiter = 10 if solver == LGMRES else 50
+            if problem==5:
+                numiter *= 3
+
             AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-10)
 
             if False:
@@ -296,7 +349,7 @@ def run1(prec, runs=[0]):
 
     except Exception, e:
         print prec, e
-        raise
+        #raise
     runs[0] += 1
 
     try:
@@ -383,6 +436,7 @@ if inexact:
     run(inexact_pressure_schur)
     #run(inexact_gs)
     #run(inexact_jacobi)
+    run(inexact_homogeneous)
 
     del Aml
 
@@ -399,6 +453,7 @@ else:
     #run(exact_A_approx_schur)
     #run(exact_A_ml_schur)
     #run(jacobi)
+    run(homogeneous)
 
     #if problem == 4:
     #    run2end(fixed_stress)
