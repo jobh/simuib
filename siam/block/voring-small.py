@@ -3,8 +3,12 @@ from dolfin import *
 import ufl
 parameters['reorder_dofs_serial'] = False
 
-dir = 'diffpack/voring-small/'
-mesh = Mesh(dir+'small-geom.xml.gz')
+subproblem = cl_args.get("subproblem")
+assert subproblem # 'small' or 'big'
+prefix = '' if subproblem=='big' else 'small-'
+
+dir = 'diffpack/voring-%s/'%subproblem
+mesh = Mesh(dir+'%sgeom.xml.gz'%prefix)
 Nd = mesh.topology().dim()
 print 'Loaded mesh'
 P0 = FunctionSpace(mesh, 'DG', 0)
@@ -37,13 +41,11 @@ def map_over_facies(arg):
 
 dx_all = ufl.integral.MeasureSum(*map_over_facies(dx))
 
-M_inv = None
+P = P0
+M_inv = LinearSolver('cg', 'amg')
+M_inv.set_operator(assemble(inner(TestFunction(P),TrialFunction(P))*dx_all))
+
 def proj(expr, mesh):
-    global M_inv
-    P = P0
-    if M_inv is None:
-        M_inv = LinearSolver('cg', 'amg')
-        M_inv.set_operator(assemble(inner(TestFunction(P),TrialFunction(P))*dx_all))
     f = assemble(expr*TestFunction(P)*dx_all)
     F = Function(P)
     M_inv.solve(F.vector(), f)
@@ -68,12 +70,18 @@ p = Function(Q)
 # set viscosity = CONSTANT = 0.002
 # set biot = CONSTANT = 1.0
 
-class FaciesIndexed(Expression):
-    def __init__(self, lst):
-        self.lst = lst
-    def eval_cell(self, values, x, cell):
-        facie = facies[cell.index]
-        values[0] = self.lst[facie]
+#class FaciesIndexed(Expression):
+#    def __init__(self, lst):
+#        self.lst = lst
+#    def eval_cell(self, values, x, cell):
+#        facie = facies[cell.index]
+#        values[0] = self.lst[facie]
+def FaciesIndexedFunction(lst):
+    v = TestFunction(P0)
+    vec = assemble(sum(map_over_facies(lambda i: Constant(lst[i])*v*dx(i))))
+    f = Function(P0)
+    M_inv.solve(f.vector(), vec)
+    return f
 
 permratio = \
     numpy.power(10, [0, 2.5, 2.5, 1.5, 2.5, 2.5, 2.5, 2.3, 2.5, 2.5,
@@ -83,16 +91,16 @@ youngmodule     = [0,   5e8, 5e8, 5e8, 5e8, 5e8, 5e8, 5e8, 5e8, 5e8,
 poissonratio    = [0,   .35, .35, .35, .35, .35, .35, .35, .35, .35,
                    .35, .35, .25, .35, .40, 0,   .20, .35]
 
-porosity = Function(P0); porosity.vector()[:] =     numpy.loadtxt(dir+'small-tn2.raw.gz')
-permZ    = Function(P0); permZ   .vector()[:] = 10**numpy.loadtxt(dir+'small-tn16.raw.gz')
+porosity = Function(P0); porosity.vector()[:] =     numpy.loadtxt(dir+'%stn2.raw.gz'%prefix)
+permZ    = Function(P0); permZ   .vector()[:] = 10**numpy.loadtxt(dir+'%stn16.raw.gz'%prefix)
 
 viscosity = Constant(1.0)
 dt    = Constant(1.0)
 alpha = Constant(1.0)
 
-nu = FaciesIndexed(poissonratio)
-E  = FaciesIndexed(youngmodule)
-permRatio = FaciesIndexed(permratio)
+nu = FaciesIndexedFunction(poissonratio)
+E  = FaciesIndexedFunction(youngmodule)
+permRatio = FaciesIndexedFunction(permratio)
 
 LambdaZ = permZ / viscosity
 LambdaXY = LambdaZ * permRatio
@@ -126,24 +134,25 @@ def v_D(q):
 def coupling(w,r):
     return - alpha * r * div(w)
 
-a00 = inner(grad(omega), sigma(v)) * dx
-a01 = coupling(omega,q) * dx
-a10 = coupling(v,phi) * dx
-a11 = -(b*phi*q - dt*inner(grad(phi),v_D(q))) * dx
+a00 = inner(grad(omega), sigma(v)) * dx_all
+a01 = coupling(omega,q) * dx_all
+a10 = coupling(v,phi) * dx_all
+a11 = -(b*phi*q - dt*inner(grad(phi),v_D(q))) * dx_all
 
 L0 = dot(t_n, omega) * ds
-L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
+L1 = coupling(u,phi) * dx_all - (r*dt + b*p)*phi * dx_all
 
 # Create boundary conditions.
 
-#bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[-1] <= 1/N/3)
-#bc_p_drained_top    = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[-1] >= 1-1/N/3)
+bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[-1] <= -5000)
+bc_p_drained_top    = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[-1] >= -3000)
 
-#bcs = [bc_u_bedrock, bc_p_drained_top]
+bcs = [bc_u_bedrock, bc_p_drained_top]
 #bcs = [bc_u_bedrock, None]
-bcs = [None, None]
+#bcs = [None, None]
 
 # Assemble the matrices and vectors
+del M_inv
 
 AA, AAns = block_symmetric_assemble([[a00,a10],[a01,a11]], bcs=bcs)
 bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)

@@ -268,7 +268,7 @@ def run1(prec, runs=[0]):
                     plot(u, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
                     plot(p, mode='color')
                     interactive()
-            numiter = 10 if solver == LGMRES else 50
+            numiter = 20 if solver == LGMRES else 150
             AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-10)
 
             if False:
@@ -375,7 +375,7 @@ if inexact:
 
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
-    run(inexact_undrained_split)
+#    run(inexact_undrained_split)
     run(inexact_drained_split)
     run(inexact_fixed_stress)
     #run(inexact_fixed_strain)
@@ -390,7 +390,7 @@ else:
     Ai = MumpsSolver(A)
     Ci = MumpsSolver(C)
 
-    run(undrained_split)
+#    run(undrained_split)
     run(drained_split)
     run(fixed_stress)
     #run(fixed_strain)
