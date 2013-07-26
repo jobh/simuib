@@ -4,6 +4,7 @@ N2 = 100
 
 alpha=0.0001
 beta=0.05
+gamma=100.0
 
 M=20; 
 for i=1:M
@@ -11,7 +12,7 @@ for i=1:M
     I2 = eye(N2, N2);
 
     A = rand(N1, N1);
-    A1 = A*A'; 
+    A1 = gamma*A*A'; 
     A = rand(N1, N1);
     A2 = A*A'; 
 
