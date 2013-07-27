@@ -1,3 +1,8 @@
 *~
 *.pyc
 /siam/exact/*.m
+/siam/block/*.pdf
+/siam/doc/presentation.pdf
+/siam/block/diffpack/
+*.pvd
+*.vtu

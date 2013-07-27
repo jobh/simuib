@@ -20,14 +20,18 @@ def get_command_line_arguments():
 
 cl_args = get_command_line_arguments()
 problem = int(cl_args.get('problem', 2))
-if problem == 3:
-    execfile('spinal_cord_3d.py')
-elif problem == 1:
+if problem == 1:
     execfile('simpleproblem.py')
+elif problem == 2:
+    execfile('spinal_cord_2d.py')
+elif problem == 3:
+    execfile('spinal_cord_3d.py')
 elif problem == 4:
     execfile('fault.py')
+elif problem == 5:
+    execfile('voring-small.py')
 else:
-    execfile('spinal_cord_2d.py')
+    raise RuntimeError("unknown problem")
 
 plot_error = int(cl_args.get("plot_error", 0))
 test = plot_error or int(cl_args.get("test", 0))
@@ -39,18 +43,24 @@ beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
 nu = lmbda/2/(lmbda+mu)
 try:
+    print 'nu = %g'%float(nu)
+    E = mu/nu* ((1.0 + nu)*(1.0 - 2.0*nu))
+    print 'E =%g'%float(E)
+    print 'Kdr =%g'%float(Kdr)
+    exit()
+except:
+    pass
+try:
     tau = alpha**2/Kdr/b if float(b)>0 else float('inf')
     print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
 except:
     pass
 
 #solvers = [BiCGStab, LGMRES, Richardson]
-#solvers = [BiCGStab, Richardson]
-solvers = [BiCGStab]
+solvers = [BiCGStab, Richardson]
+#solvers = [BiCGStab]
 #solvers = [Richardson]
 #solvers = [LGMRES]
-
-rbm = rigid_body_modes(V)
 
 # Assemble the matrices and vectors
 
@@ -80,10 +90,11 @@ def inexact_pressure_schur():
 inexact_pressure_schur.color = 'c'
 
 def inexact_symm_schur():
-    Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
-    SS = [[Aml, B],
-          [BT,  Sp ]]
+    Sp = ML(collapse(C-BT*InvDiag(A)*B))
+    SS = [[Aml, 0],
+          [0,  Sp]]
     return block_mat(SS).scheme('sgs')
+inexact_symm_schur.color='k'
 
 def inexact_gs():
     Cp = DD_ILUT(C)
@@ -205,6 +216,80 @@ def optimized_fixed_stress():
           [BT, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
+def create_homogeneous():
+    # Note: Probably only works with problem=2 (and maybe 3)
+    area = assemble(Constant(1)*dx, mesh=mesh)
+    mu_avg = assemble(mu*dx, mesh=mesh)/area
+    lmbda_avg = assemble(lmbda*dx, mesh=mesh)/area
+    K_avg = assemble(K*dx, mesh=mesh)/area
+    b_avg = assemble(b*dx, mesh=mesh)/area
+    lmbdamuInv_avg = assemble(lmbdamuInv*dx, mesh=mesh)/area
+
+    def sigma(v):
+        return 2.0*mu_avg*sym(grad(v)) + lmbda_avg*tr(grad(v))*Identity(Nd)
+    def v_D(q):
+        return -K_avg*grad(q)
+    def coupling(w,r):
+        return - alpha * r * div(w)
+    def corr(test, trial):
+        return 1*lmbdamuInv_avg*h**2*inner(grad(test), grad(trial))
+
+    a00 = inner(grad(omega), sigma(v)) * dx
+    a01 = coupling(omega,q) * dx
+    a10 = coupling(v,phi) * dx
+    a11 = -(b_avg*phi*q - dt*inner(grad(phi),v_D(q))) * dx - corr(phi, q)*dx
+
+    AAhom, _ = block_symmetric_assemble([[a00, a01], [a10, a11]], bcs=bcs)
+    return AAhom
+
+def homogeneous():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Ainv = MumpsSolver(Ahom)
+    Cinv = MumpsSolver(Chom)
+    SS = block_mat([[Ainv, Bhom],
+                    [Bhom.T, Cinv]])
+    return SS.scheme('tgs')
+homogeneous.color = 'y'
+
+def inexact_homogeneous():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
+    Cinv = DD_ILUT(Chom)
+    SS = block_mat([[Ainv, Bhom],
+                    [Bhom.T, Cinv]])
+    return SS.scheme('tgs')
+inexact_homogeneous.color = 'y'
+
+def homogeneous_pressure_schur():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Ai = MumpsSolver(Ahom)
+    Sp = MumpsSolver(collapse(Chom-Bhom.T*InvDiag(Ahom)*Bhom))
+    Si = BiCGStab(Chom-Bhom.T*Ai*Bhom, precond=Sp, tolerance=1e-14,
+                  nonconvergence_is_fatal=True)
+    SS = [[Ai, Bhom],
+          [Bhom.T, Si]]
+    return block_mat(SS).scheme('tgs', reverse=True)
+homogeneous_pressure_schur.color = 'g'
+
+def inexact_homogeneous_pressure_schur():
+    [[Ahom, Bhom],
+     [_, Chom]]  = create_homogeneous()
+
+    Sinv = MumpsSolver(collapse(Chom-Bhom.T*InvDiag(Ahom)*Bhom))
+    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
+    SS = block_mat([[Ainv, Bhom],
+                    [Bhom.T, Sinv]])
+    return SS.scheme('tgs')
+inexact_homogeneous_pressure_schur.color = 'g'
+
+#==================
+
 x0 = AA.create_vec()
 x0.randomize()
 
@@ -232,9 +317,9 @@ def run1(prec, runs=[0]):
             res0 = (AA*x0-bb).norm()
             err0U = x0[0].norm('l2')
             err0P = x0[1].norm('l2')
-            res0 = 1.0
-            err0U = 1.0
-            err0P = 1.0
+            #res0 = 1.0
+            #err0U = 1.0
+            #err0P = 1.0
 
             residuals = [(AA*x0-bb).norm()/res0]
             errorsU = [x0[0].norm('l2')/err0U]
@@ -258,6 +343,9 @@ def run1(prec, runs=[0]):
                     plot(p, mode='color')
                     interactive()
             numiter = 10 if solver == LGMRES else 50
+            if problem==5:
+                numiter *= 3
+
             AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-10)
 
             if False:
@@ -285,7 +373,7 @@ def run1(prec, runs=[0]):
 
     except Exception, e:
         print prec, e
-        raise
+        #raise
     runs[0] += 1
 
     try:
@@ -359,18 +447,21 @@ def run2end(prec):
 run=run1
 
 if inexact:
+    rbm = rigid_body_modes(V)
     Aml = ML(A, pdes=Nd, nullspace=rbm)
 
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
-    ##run(inexact_undrained_split)
+#    run(inexact_undrained_split)
     run(inexact_drained_split)
     run(inexact_fixed_stress)
-    ##run(inexact_fixed_strain)
+    #run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
     run(inexact_pressure_schur)
     #run(inexact_gs)
     #run(inexact_jacobi)
+    run(inexact_homogeneous)
+    run(inexact_homogeneous_pressure_schur)
 
     del Aml
 
@@ -378,15 +469,17 @@ else:
     Ai = MumpsSolver(A)
     Ci = MumpsSolver(C)
 
-    run(undrained_split)
+#    run(undrained_split)
     run(drained_split)
     run(fixed_stress)
-    run(fixed_strain)
+    #run(fixed_strain)
     #run(optimized_fixed_stress)
     run(pressure_schur)
     #run(exact_A_approx_schur)
     #run(exact_A_ml_schur)
-    run(jacobi)
+    #run(jacobi)
+    run(homogeneous)
+    run(homogeneous_pressure_schur)
 
     #if problem == 4:
     #    run2end(fixed_stress)
