@@ -14,7 +14,7 @@ do_plot = 'sSlLpd'
 #do_plot = ''
 
 # Mesh
-mesh = UnitInterval(128)  	# Buckley-Leverett 1D (on line interval)
+mesh = UnitIntervalMesh(128)  	# Buckley-Leverett 1D (on line interval)
 #mesh = UnitCircle(16)   	# Buckley-Leverett 2D (on circle, divided by 4)
 
 # End time

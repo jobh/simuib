@@ -2,7 +2,7 @@ from __future__ import division
 
 from dolfin import *
 from block import *
-from block.algebraic.trilinos import *
+from block.algebraic.petsc import *
 from block.iterative import *
 from matplotlib import pyplot
 import numpy
@@ -433,16 +433,28 @@ def run2end(prec):
     AAinv = BiCGStab(AA, precond=precond)
     pv = p.vector()
     uv = u.vector()
-    for i in range(1):
+    t = 0
+    while t < T:
+        t += float(dt)
         xx = AAinv(tolerance=1e-10, show=2)*bb
         uv[:], pv[:] = xx
 
-        # Plot
-        plot(u, key='1', mode='displacement')
-        plot(p, key='2', mode='color')
-        #plot(tr(sigma(u)), title='tr sigma', key='3', mode='color')
+        #v = rigid_body_modes(V)
+        #orthogonalize(uv, v)
 
-    interactive()
+        # Plot
+        #plot(u)
+        plot(u, key='1', title='u', mode='displacement')
+        plot(p, key='2', title='p', mode='color')
+        #plot(div(u), key='3', title='div(u)', mode='color')
+        #plot(p-(2*nu/Nd+lmbda)*div(u), title='p-tr(sigma)/D', key='4', mode='color')
+        #plot((2*mu/Nd+lmbda)*div(u), title='p-z div(u)', key='4', mode='color')
+        plot(p-tr(sigma(u))/Nd, title='p-tr(sigma)/D', key='4.1', mode='color')
+        bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
+
+        from util import PlotLine
+        pl = PlotLine(mesh, lambda x: [2*x-1, 0])
+        pl(project(p-tr(sigma(u))/Nd, Q), title="p-tr(sigma)/D")
 
 run=run1
 
@@ -469,6 +481,9 @@ else:
     Ai = MumpsSolver(A)
     Ci = MumpsSolver(C)
 
+    if problem == 4:
+        run2end(pressure_schur)
+
 #    run(undrained_split)
     run(drained_split)
     run(fixed_stress)
@@ -480,9 +495,6 @@ else:
     #run(jacobi)
     run(homogeneous)
     run(homogeneous_pressure_schur)
-
-    #if problem == 4:
-    #    run2end(fixed_stress)
 
     del Ai
     del Ci

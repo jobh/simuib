@@ -266,7 +266,7 @@ elif pia_perm == 0 and caps_perm == 0:
 #h = mesh.hmin()
 # Assemble the matrices and vectors
 
-AA,AAns = block_symmetric_assemble([[a00, a01],
+AA,AAns,_ = block_symmetric_assemble([[a00, a01],
                                     [a10, a11]], bcs=bcs)
 
 bb = block_assemble([L0, L1], symmetric_mod=AAns, bcs=bcs)

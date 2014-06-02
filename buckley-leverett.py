@@ -28,8 +28,8 @@ if dim == 2:
     plotline = PlotLine(mesh, lambda r:[r,0])
 else:
     # Line coincides with domain; plot only one
-    do_plot.replace('s', 'l')
-    do_plot.replace('S', 'L')
+    do_plot = do_plot.replace('s', 'l')
+    do_plot = do_plot.replace('S', 'L')
     plotline = PlotLine(mesh, lambda r:r)
 
 ##
@@ -68,7 +68,8 @@ def f_upwind_flux(s,u):
 # General definitions (aliases)
 P0 = FunctionSpace(mesh, "DG", 0)
 P1 = FunctionSpace(mesh, "CG", 1)
-RT0 = FunctionSpace(mesh, "RT", 1) if dim>1 else P1
+P1v = VectorFunctionSpace(mesh, "CG", 1)
+RT0 = FunctionSpace(mesh, "RT", 1) if dim>1 else P1v
 
 # Spaces in use
 V = RT0
@@ -101,7 +102,7 @@ s_soln.vector()[:] = 0.0
 
 if dim == 1:
     def _bc_u_dom(x, on_boundary): return on_boundary and x[0]<0.5
-    _bc_u_val = Constant(0)
+    _bc_u_val = [Constant(0)]
 else:
     # Scale outflow to 1. The pressure solution is sensitive to this value, and
     # the boundary is not an exact circle.
@@ -171,7 +172,7 @@ while t < T-float(dt)/2:
     ##
 
     if dim == 1:
-        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/x)-1)), P1))
+        s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/x[0])-1)), P1))
     else:
         s_anal.assign(project((1.0/(lmbda-1)*(sqrt(lmbda*Constant(t)/pi/dot(x,x))-1)), P1))
     vec = s_anal.vector()
@@ -179,7 +180,7 @@ while t < T-float(dt)/2:
     vec[vec<0.0] = 0.0
 
     if 'S' in do_plot:
-        plot(s_anal, title="s analytical [t=%.2f]"%t)
+        plot(s_anal, title="s analytical dom [t=%.2f]"%t)
     if 'L' in do_plot:
         plotline(s_anal, title="s analytical [t=%.2f]"%t)
     if 'm' in do_plot:

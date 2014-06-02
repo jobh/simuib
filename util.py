@@ -9,7 +9,7 @@ class PlotLine(object):
     dim>1)."""
     def __init__(self, mesh, mapping):
         hmin = MPI.min(mesh.hmin())
-        self.mesh = UnitInterval(int(1.0/hmin))
+        self.mesh = UnitIntervalMesh(int(1.0/hmin))
         self.V = FunctionSpace(self.mesh, "CG", 1)
         self.F = {}
         self.mapping = mapping
@@ -18,7 +18,8 @@ class PlotLine(object):
         if not expr in self.F:
             self.F[expr] = Function(self.V)
         v = self.F[expr].vector()
-        for i,x in enumerate(self.mesh.coordinates()):
+        index_map = dof_to_vertex_map(self.V)
+        for i,x in enumerate(self.mesh.coordinates()[index_map]):
             v[i] = expr(self.mapping(x))
         plot(self.F[expr], title=title)
 
