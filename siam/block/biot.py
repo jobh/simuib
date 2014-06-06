@@ -2,8 +2,10 @@ from __future__ import division
 
 from dolfin import *
 from block import *
-from block.algebraic.petsc import *
+from block.algebraic.trilinos import *
 from block.iterative import *
+from block.dolfin_util import rigid_body_modes
+from block.block_util import isequal
 from matplotlib import pyplot
 import numpy
 
@@ -32,6 +34,9 @@ elif problem == 5:
     execfile('voring-small.py')
 else:
     raise RuntimeError("unknown problem")
+
+if not issymmetric(AA):
+    raise RuntimeError("not symmetric")
 
 plot_error = int(cl_args.get("plot_error", 0))
 test = plot_error or int(cl_args.get("test", 0))
@@ -66,31 +71,32 @@ solvers = [BiCGStab, Richardson]
 
 [[A,  B],
  [BT, C]] = AA
+del BT # use B.T instead, save the memory...
 
 def pressure_schur():
-    Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
+    Sp = MumpsSolver(collapse(C-B.T*InvDiag(A)*B))
     Si = BiCGStab(C-B.T*Ai*B, precond=Sp, tolerance=1e-14,
                   nonconvergence_is_fatal=True)
     SS = [[Ai, B],
-          [BT, Si]]
+          [B.T, Si]]
     return block_mat(SS).scheme('tgs', reverse=True)
 pressure_schur.color = 'c'
 
 def exact_A_approx_schur():
-    Sp = MumpsSolver(collapse(C-BT*InvDiag(A)*B))
+    Sp = MumpsSolver(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Ai, B],
-          [BT, Sp]]
+          [B.T, Sp]]
     return block_mat(SS).scheme('sgs')
 
 def inexact_pressure_schur():
-    Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
+    Sp = DD_ILUT(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Aml, B],
-          [BT,  Sp ]]
+          [B.T,  Sp ]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_pressure_schur.color = 'c'
 
 def inexact_symm_schur():
-    Sp = ML(collapse(C-BT*InvDiag(A)*B))
+    Sp = ML(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Aml, 0],
           [0,  Sp]]
     return block_mat(SS).scheme('sgs')
@@ -99,38 +105,38 @@ inexact_symm_schur.color='k'
 def inexact_gs():
     Cp = DD_ILUT(C)
     SS = [[Aml, B],
-          [BT, Cp]]
+          [B.T, Cp]]
     return block_mat(SS).scheme('tgs')
 
 def inexact_jacobi():
     Cp = DD_ILUT(C)
-    #Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
+    #Sp = DD_ILUT(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Aml, B],
-          [BT, Cp]]
+          [B.T, Cp]]
     return block_mat(SS).scheme('jac')
 inexact_jacobi.color='y'
 
 def jacobi():
     SS = [[Ai, B],
-          [BT, Ci]]
+          [B.T, Ci]]
     return block_mat(SS).scheme('jac')
 jacobi.color='y'
 
 def exact_A_ml_schur():
-    Sp = DD_ILUT(collapse(C-BT*InvDiag(A)*B))
+    Sp = DD_ILUT(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Ai, B],
-          [BT, Sp]]
+          [B.T, Sp]]
     return block_mat(SS).scheme('sgs')
 
 def inexact_drained_split():
     SS = [[Aml, B],
-          [BT, DD_ILUT(C)]]
+          [B.T, DD_ILUT(C)]]
     return block_mat(SS).scheme('tgs')
 inexact_drained_split.color = 'g'
 
 def drained_split():
     SS = [[Ai, B],
-          [BT, Ci]]
+          [B.T, Ci]]
     return block_mat(SS).scheme('tgs')
 drained_split.color = 'g'
 
@@ -143,10 +149,10 @@ def undrained_split():
         pass
     b_ = assemble(-b/alpha*q*phi*dx)
     b_i = MumpsSolver(b_)
-    SAi = ConjGrad(A-B*b_i*BT, precond=Ai, show=1, tolerance=1e-14,
+    SAi = ConjGrad(A-B*b_i*B.T, precond=Ai, show=1, tolerance=1e-14,
                    nonconvergence_is_fatal=True)
     SS = [[SAi, B],
-          [BT, Ci]]
+          [B.T, Ci]]
     return block_mat(SS).scheme('tgs')
 undrained_split.color = 'b'
 
@@ -159,22 +165,22 @@ def inexact_undrained_split():
         pass
     b_ = assemble(-b/alpha*q*phi*dx)
     b_i = InvDiag(b_)
-    SAi = ML(collapse(A-B*b_i*BT))
+    SAi = ML(collapse(A-B*b_i*B.T))
 
     SS = [[SAi, B],
-          [BT, DD_ILUT(C)]]
+          [B.T, DD_ILUT(C)]]
     return block_mat(SS).scheme('tgs')
 inexact_undrained_split.color = 'b'
 
 def fixed_strain():
     SS = [[Ai, B],
-          [BT, Ci]]
+          [B.T, Ci]]
     return block_mat(SS).scheme('tgs', reverse=True)
 fixed_strain.color = 'k'
 
 def inexact_fixed_strain():
     SS = [[Aml, B],
-          [BT, DD_ILUT(C)]]
+          [B.T, DD_ILUT(C)]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_fixed_strain.color = 'k'
 
@@ -184,7 +190,7 @@ def fixed_stress():
     SC   = collapse(C+Nd*beta_inv)
     SCi  = MumpsSolver(SC)
     SS = [[Ai, B],
-          [BT, SCi]]
+          [B.T, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 fixed_stress.color='r'
 
@@ -194,7 +200,7 @@ def inexact_fixed_stress():
     SC   = collapse(C+Nd*beta_inv)
     SCp  = DD_ILUT(SC)
     SS = [[Aml, B],
-          [BT, SCp]]
+          [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_fixed_stress.color='r'
 
@@ -204,7 +210,7 @@ def inexact_optimized_fixed_stress():
     SC   = collapse(C+Nd/2*beta_inv)
     SCp  = DD_ILUT(SC)
     SS = [[Aml, B],
-          [BT, SCp]]
+          [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def optimized_fixed_stress():
@@ -213,7 +219,7 @@ def optimized_fixed_stress():
     SC   = collapse(C+Nd/2*beta_inv)
     SCi  = MumpsSolver(SC)
     SS = [[Ai, B],
-          [BT, SCi]]
+          [B.T, SCi]]
     return block_mat(SS).scheme('tgs', reverse=True)
 
 def create_homogeneous():
@@ -450,11 +456,13 @@ def run2end(prec):
         #plot(p-(2*nu/Nd+lmbda)*div(u), title='p-tr(sigma)/D', key='4', mode='color')
         #plot((2*mu/Nd+lmbda)*div(u), title='p-z div(u)', key='4', mode='color')
         plot(p-tr(sigma(u))/Nd, title='p-tr(sigma)/D', key='4.1', mode='color')
-        bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
+        bb = block_assemble([L0,L1]);
+        rhs_bc.apply(bb)
 
         from util import PlotLine
-        pl = PlotLine(mesh, lambda x: [2*x-1, 0])
-        pl(project(p-tr(sigma(u))/Nd, Q), title="p-tr(sigma)/D")
+        #pl = PlotLine(mesh, lambda x: [2*x-1, 0])
+        #pl(project(p-tr(sigma(u))/Nd, Q), title="p-tr(sigma)/D")
+    interactive()
 
 run=run1
 

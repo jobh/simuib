@@ -8,7 +8,7 @@ class PlotLine(object):
     argument maps from the interval [0,1] to a xD coordinate (a list when
     dim>1)."""
     def __init__(self, mesh, mapping):
-        hmin = MPI.min(mesh.hmin())
+        hmin = MPI.min(None, mesh.hmin())
         self.mesh = UnitIntervalMesh(int(1.0/hmin))
         self.V = FunctionSpace(self.mesh, "CG", 1)
         self.F = {}

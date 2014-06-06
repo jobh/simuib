@@ -19,7 +19,7 @@ while mesh.num_cells() < N :
     mesh = refine(mesh)
 
 Nd = mesh.topology().dim()
-x = mesh.ufl_cell().x
+x = SpatialCoordinate(mesh)
 
 V = VectorFunctionSpace(mesh, "CG", 2)
 Q = FunctionSpace(mesh, "CG", 1)
@@ -71,8 +71,8 @@ a01 = coupling(omega,q) * dx
 a10 = coupling(v,phi) * dx
 a11 = -(b*phi*q - dt*inner(grad(phi),v_D(q))) * dx
 
-L0 = dot(t_n, omega) * ds
-L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
+L0 = dot(t_n*FacetNormal(mesh), v) * ds
+L1 = coupling(u, q) * dx - (r*dt + b*p)*q * dx
 
 # Create boundary conditions.
 
@@ -81,7 +81,7 @@ L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
 #bc_u2 = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[0], 1.0) and abs(x[1]) <=2*eps, method='pointwise')
 #bc_u3 = DirichletBC(V.sub(1), 0.0,  lambda x,bdry: near(x[0], X0) and abs(x[1]) <= 2*eps, method='pointwise')
 #bc_u2 = DirichletBC(V, [0.0]*Nd,   lambda x,bdry: x[0]==1.0 and x[1]==0.0, method='pointwise')
-bc_u2 = DirichletBC(V, [0.0]*Nd,   lambda x,bdry: near(x[0],0.0) and x[1]==0.0, method='pointwise')
+bc_u2 = DirichletBC(V.sub(0), 0.0, lambda x,bdry: x[0]==1.0 and x[1]==0.0, method='pointwise')
 bc_u3 = DirichletBC(V.sub(1), 0.0, lambda x,bdry: x[0] > X0 and near(x[1], 0.0), method='pointwise')
 bc_u = [bc_u3, bc_u2]
 
@@ -99,5 +99,6 @@ bcs = [bc_u, bc_p]
 # Assemble the matrices and vectors
 
 
-AA, AAns = block_symmetric_assemble([[a00,a10],[a01,a11]], bcs=bcs)
-bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
+AA = block_assemble([[a00,a10],[a01,a11]])
+bb = block_assemble([L0,L1])
+rhs_bc = block_bc(bcs, True).apply(AA).apply(bb)

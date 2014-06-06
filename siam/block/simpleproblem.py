@@ -70,12 +70,12 @@ def coupling(w,r):
     return - alpha * r * div(w)
 
 a00 = inner(grad(omega), sigma(v)) * dx
-a01 = coupling(omega,q) * dx
-a10 = coupling(v,phi) * dx
-a11 = -(b*phi*q - dt*inner(grad(phi),v_D(q))) * dx
+a01 = coupling(omega, q) * dx
+a10 = coupling(v, phi) * dx
+a11 = -(b*phi*q - dt*inner(grad(phi), v_D(q))) * dx
 
-L0 = dot(t_n, omega) * ds
-L1 = coupling(u,phi) * dx - (r*dt + b*p)*phi * dx
+L0 = dot(t_n, v) * ds
+L1 = coupling(u, q) * dx - (r*dt + b*p)*q * dx
 
 # Create boundary conditions.
 
@@ -87,6 +87,7 @@ bcs = [bc_u_bedrock, None]
 
 # Assemble the matrices and vectors
 
-AA, AAns = block_symmetric_assemble([[a00,a10],[a01,a11]], bcs=bcs)
-bb = block_assemble([L0,L1], bcs=bcs, symmetric_mod=AAns)
+AA = block_assemble([[a00,a10],[a01,a11]])
+bb = block_assemble([L0,L1])
 
+block_bc(bcs, True).apply(AA).apply(bb)

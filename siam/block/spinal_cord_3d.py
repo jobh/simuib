@@ -60,11 +60,11 @@ p_prev = Function(W)
 
 #========
 # Define forms, material parameters, boundary conditions, etc.
-boundary_markers = mesh.domains().facet_domains(mesh)
+boundary_markers = MeshFunction('size_t', mesh, Nd-1, mesh.domains())
 marker_file_boundary = File("boundary_markers.pvd")
 marker_file_boundary << boundary_markers
 
-domain_markers = mesh.domains().cell_domains(mesh)
+domain_markers = MeshFunction('size_t', mesh, Nd, mesh.domains())
 marker_file_domain = File("domain_markers.pvd")
 marker_file_domain << domain_markers
 
@@ -82,8 +82,8 @@ neuman_boundary.mark(boundary_markers, 1)
 marker_file1 = File("boundary_markers_dolfin.pvd")
 marker_file1 << boundary_markers
 """
-ds_subd = ds[boundary_markers]
-dx_subd = dx[domain_markers]
+ds_subd = ds(domain=mesh, subdomain_data=boundary_markers)
+dx_subd = dx(domain=mesh, subdomain_data=domain_markers)
 pmax = 8.0#800 Pa
 v_wave = 200.0 # cm/s (for a period of 1 sec we get wavelength equal wavevelocity
 u0 = Constant([0.0]*Nd)
@@ -131,7 +131,7 @@ class applied_pres(Expression):
         #print type(y), type(self.a), type(v_wave)
         value[0] = splev(1./v_wave*(y + v_wave*self.a) % 2.0, pres_spline)
         #value[0] = sin((2*pi)/v_wave*(y+v_wave*self.a))
-        
+
 p0 = applied_pres()
 
 def sigma(v):
@@ -145,14 +145,13 @@ def corr(q):
     C = h**2/(4*(lmbda+2*mu))
     return C*grad(q)
 
-
 a00 = inner(grad(omega), sigma(v)) * dx
 a01 = coupling(omega,q) * dx
 a10 = coupling(v,phi) * dx
 a11 = sum(-(b*phi*q - dt*inner(grad(phi),v_D(K[i], q)) + on*inner(corr(q), grad(phi))) * dx_subd(i) for i in range(3))
 
-L0 = inner(omega, -p0*n)*ds_subd(7)
-L1 =  (coupling(u_prev,phi) - (Q*dt + b*p_prev)*phi - on*inner(corr(p_prev), grad(phi))) * dx
+L0 = inner(v, -p0*n)*ds_subd(7)
+L1 =  (coupling(u_prev, q) - (Q*dt + b*p_prev)*q - on*inner(corr(p_prev), grad(q))) * dx
 
 # Create boundary conditions.
 bcu0 = DirichletBC(V, u0, 3)
@@ -168,6 +167,7 @@ bcs = [[bcu0, bcu1, bcu_z5,bcu_z6,bcu_z8,bcu_z9], [bcp]]
 # Assemble the matrices
 # Insert the matrices into blocks
 
-AA, AA_ = block_symmetric_assemble([[a00, a01],
-                                    [a10, a11]], bcs=bcs)
-bb = block_assemble([L0, L1], symmetric_mod=AA_, bcs=bcs)
+AA = block_assemble([[a00, a01],
+                     [a10, a11]])
+bb = block_assemble([L0, L1])
+block_bc(bcs, True).apply(AA).apply(bb)
