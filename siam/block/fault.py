@@ -21,7 +21,7 @@ while mesh.num_cells() < N :
 Nd = mesh.topology().dim()
 x = SpatialCoordinate(mesh)
 
-V = VectorFunctionSpace(mesh, "CG", 2)
+V = VectorFunctionSpace(mesh, "CG", 1)
 Q = FunctionSpace(mesh, "CG", 1)
 
 v, omega = TestFunction(V), TrialFunction(V)
@@ -35,29 +35,32 @@ p = Function(Q)
 
 ### Material parameters
 
-P0    = Constant(1)
-lmbda = Constant(1)
-mu    = Constant(1)
+E = 12e9
+nu = 0.4
+
+P0    = Constant(0)
+lmbda = Constant(E*nu/(1+nu)/(1-2*nu))
+mu    = Constant(E/2/(1+nu))
 dt    = Constant(1)
 b     = Constant(1)
 alpha = Constant(1)
-Lambda = Constant(1)
+Lambda = Constant(3e-8)
 
-p = project(-P0*x[0], Q)
+class overpressure(Expression):
+    def eval(self, value, x):
+        value[0] = 0
+        if x[0] == -1:# and near(x[1],0.0):
+            value[0] = -1e8
+pressure = -P0*x[0]
 
-t_n = Constant( [0.0]*Nd )
+p.vector()[:] = project(pressure, Q).vector()
 
-T = 1.0
+t_n = Constant(0.0)
+t_n = overpressure()
 
-r = Constant(0)
+T = float(dt)*100
 
-U = Expression([
-    "-1.0/3*atan2(x[1],x[0])*sqrt(x[1]*x[1]+x[0]*x[0])*-sin(atan2(x[1],x[0]))",
-    "-1.0/3*atan2(x[1],x[0])*sqrt(x[1]*x[1]+x[0]*x[0])*cos(atan2(x[1],x[0]))"
-    ]);
-
-U0=project(U,V)
-interactive()
+r = Constant(1)
 
 def sigma(v):
     return 2.0*mu*sym(grad(v)) + lmbda*tr(grad(v))*Identity(Nd)
@@ -76,24 +79,8 @@ L1 = coupling(u, q) * dx - (r*dt + b*p)*q * dx
 
 # Create boundary conditions.
 
-#bc_u = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[0], 1.0))
-#bc_u1 = DirichletBC(V.sub(0), 0.0,  lambda x,bdry: near(x[0], 1.0))
-#bc_u2 = DirichletBC(V, [0.0]*Nd,  lambda x,bdry: near(x[0], 1.0) and abs(x[1]) <=2*eps, method='pointwise')
-#bc_u3 = DirichletBC(V.sub(1), 0.0,  lambda x,bdry: near(x[0], X0) and abs(x[1]) <= 2*eps, method='pointwise')
-#bc_u2 = DirichletBC(V, [0.0]*Nd,   lambda x,bdry: x[0]==1.0 and x[1]==0.0, method='pointwise')
-bc_u2 = DirichletBC(V.sub(0), 0.0, lambda x,bdry: x[0]==1.0 and x[1]==0.0, method='pointwise')
-bc_u3 = DirichletBC(V.sub(1), 0.0, lambda x,bdry: x[0] > X0 and near(x[1], 0.0), method='pointwise')
-bc_u = [bc_u3, bc_u2]
-
-#bc_p = DirichletBC(Q, -P0*x[0], lambda x,bdry: bdry and (abs(x[1]) > eps or x[0]>X0))
-#bc_p_fault = DirichletBC(Q, P0, lambda x,bdry: bdry and abs(x[1]) <= eps and x[0] <= X0)
-bc_p_bdry = DirichletBC(Q, -P0*x[0], lambda x,bdry: bdry and x[1] > 0.0)
-bc_p_fault = DirichletBC(Q, P0, lambda x,bdry: bdry and near(x[1], 0.0) and x[0] <= X0)
-#plot(bc_p)
-#plot(bc_p_fault)
-#interactive()
-bc_p = [bc_p_bdry, bc_p_fault]
-
+bc_u = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and near(x[0], 1.0))
+bc_p = DirichletBC(Q, 1e8, lambda x, bdry: bdry and near(x[0], -1.0))
 bcs = [bc_u, bc_p]
 
 # Assemble the matrices and vectors

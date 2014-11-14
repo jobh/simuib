@@ -170,8 +170,8 @@ h = mesh.hmax()
 t_n = Constant([0.0]*Nd)
 f_n = Constant([0.0]*Nd)
 
-dt = Constant(.5)
 #dt = Constant(0.00125)
+dt = Constant(0.001)
 T = 1
 
 Q = Constant(0)

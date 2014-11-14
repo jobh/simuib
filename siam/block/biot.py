@@ -6,10 +6,12 @@ from block.algebraic.trilinos import *
 from block.iterative import *
 from block.dolfin_util import rigid_body_modes
 from block.block_util import isequal
-from matplotlib import pyplot
-import numpy
+from matplotlib import pyplot, rcParams
+import numpy, random
 
-set_log_level(PROGRESS if MPI.process_number()==0 else ERROR)
+rcParams.update({'font.size': 14})
+
+set_log_level(PROGRESS if MPI.rank(None)==0 else ERROR)
 
 def get_command_line_arguments():
     import sys
@@ -89,7 +91,7 @@ def exact_A_approx_schur():
     return block_mat(SS).scheme('sgs')
 
 def inexact_pressure_schur():
-    Sp = DD_ILUT(collapse(C-B.T*InvDiag(A)*B))
+    Sp = ML(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Aml, B],
           [B.T,  Sp ]]
     return block_mat(SS).scheme('tgs', reverse=True)
@@ -103,42 +105,42 @@ def inexact_symm_schur():
 inexact_symm_schur.color='k'
 
 def inexact_gs():
-    Cp = DD_ILUT(C)
+    Cp = ML(C)
     SS = [[Aml, B],
           [B.T, Cp]]
     return block_mat(SS).scheme('tgs')
 
 def inexact_jacobi():
-    Cp = DD_ILUT(C)
-    #Sp = DD_ILUT(collapse(C-B.T*InvDiag(A)*B))
+    Cp = ML(C)
+    #Sp = ML(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Aml, B],
           [B.T, Cp]]
     return block_mat(SS).scheme('jac')
-inexact_jacobi.color='y'
+inexact_jacobi.color='k'
 
 def jacobi():
     SS = [[Ai, B],
           [B.T, Ci]]
     return block_mat(SS).scheme('jac')
-jacobi.color='y'
+jacobi.color='k'
 
 def exact_A_ml_schur():
-    Sp = DD_ILUT(collapse(C-B.T*InvDiag(A)*B))
+    Sp = ML(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Ai, B],
           [B.T, Sp]]
     return block_mat(SS).scheme('sgs')
 
 def inexact_drained_split():
     SS = [[Aml, B],
-          [B.T, DD_ILUT(C)]]
+          [B.T, ML(C)]]
     return block_mat(SS).scheme('tgs')
-inexact_drained_split.color = 'g'
+inexact_drained_split.color = 'y'
 
 def drained_split():
     SS = [[Ai, B],
           [B.T, Ci]]
     return block_mat(SS).scheme('tgs')
-drained_split.color = 'g'
+drained_split.color = 'y'
 
 def undrained_split():
     # Stable (note sign change)
@@ -149,12 +151,15 @@ def undrained_split():
         pass
     b_ = assemble(-b/alpha*q*phi*dx)
     b_i = MumpsSolver(b_)
-    SAi = ConjGrad(A-B*b_i*B.T, precond=Ai, show=1, tolerance=1e-14,
+    SAi = ConjGrad(A-B*b_i*B.T, precond=Ai, show=1, tolerance=1e-15,
                    nonconvergence_is_fatal=True)
     SS = [[SAi, B],
           [B.T, Ci]]
     return block_mat(SS).scheme('tgs')
 undrained_split.color = 'b'
+
+
+SAi_ = None
 
 def inexact_undrained_split():
     # Stable (note sign change)
@@ -165,10 +170,13 @@ def inexact_undrained_split():
         pass
     b_ = assemble(-b/alpha*q*phi*dx)
     b_i = InvDiag(b_)
-    SAi = ML(collapse(A-B*b_i*B.T))
+    global SAi_
+    if SAi_ is None:
+        SAi_ = ML(collapse(A-B*b_i*B.T))
+    SAi = SAi_
 
     SS = [[SAi, B],
-          [B.T, DD_ILUT(C)]]
+          [B.T, ML(C)]]
     return block_mat(SS).scheme('tgs')
 inexact_undrained_split.color = 'b'
 
@@ -176,13 +184,13 @@ def fixed_strain():
     SS = [[Ai, B],
           [B.T, Ci]]
     return block_mat(SS).scheme('tgs', reverse=True)
-fixed_strain.color = 'k'
+fixed_strain.color = 'g'
 
 def inexact_fixed_strain():
     SS = [[Aml, B],
-          [B.T, DD_ILUT(C)]]
+          [B.T, ML(C)]]
     return block_mat(SS).scheme('tgs', reverse=True)
-inexact_fixed_strain.color = 'k'
+inexact_fixed_strain.color = 'g'
 
 def fixed_stress():
     # Stable (note sign change)
@@ -198,8 +206,8 @@ def inexact_fixed_stress():
     # Stable (note sign change)
     beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
-    SCp  = DD_ILUT(SC)
-    SS = [[Aml, B],
+    SCp  = ML(SC)
+    SS = [[MumpsSolver(A), B],
           [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_fixed_stress.color='r'
@@ -208,7 +216,7 @@ def inexact_optimized_fixed_stress():
     # Stable (note sign change)
     beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd/2*beta_inv)
-    SCp  = DD_ILUT(SC)
+    SCp  = ML(SC)
     SS = [[Aml, B],
           [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
@@ -264,7 +272,7 @@ def inexact_homogeneous():
      [_, Chom]]  = create_homogeneous()
 
     Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
-    Cinv = DD_ILUT(Chom)
+    Cinv = ML(Chom)
     SS = block_mat([[Ainv, Bhom],
                     [Bhom.T, Cinv]])
     return SS.scheme('tgs')
@@ -297,10 +305,13 @@ inexact_homogeneous_pressure_schur.color = 'g'
 #==================
 
 x0 = AA.create_vec()
-x0.randomize()
+#numpy.random.seed()
+#x0.randomize()
 
-print x0[0].size()+x0[1].size()
 x0s = []
+
+def norm(x,M):
+    return sqrt(abs(x.inner(M*x)))
 
 def run1(prec, runs=[0]):
     try:
@@ -316,20 +327,18 @@ def run1(prec, runs=[0]):
 
             if test:
                 bb.zero()
-                x0[0] *= 1/x0[0].norm('l2')
-                x0[1] *= 1/x0[1].norm('l2')
+                x0[0] *= 1/norm(x0[0],A)
+                x0[1] *= 1/norm(x0[1],C)
 
             # Solve
             res0 = (AA*x0-bb).norm()
-            err0U = x0[0].norm('l2')
-            err0P = x0[1].norm('l2')
-            #res0 = 1.0
-            #err0U = 1.0
-            #err0P = 1.0
+            err0U = norm(x0[0], A)
+            err0P = norm(x0[1], C)
 
-            residuals = [(AA*x0-bb).norm()/res0]
-            errorsU = [x0[0].norm('l2')/err0U]
-            errorsP = [x0[1].norm('l2')/err0P]
+            #residuals = [(AA*x0-bb).norm()/res0]
+            residuals = [1.0]
+            errorsU = [1.0]
+            errorsP = [1.0]
             if plot_error:
                 pv = p.vector()
                 uv = u.vector()
@@ -340,8 +349,8 @@ def run1(prec, runs=[0]):
                 interactive(True)
             def cb(k, x, r):
                 residuals.append((AA*x-bb).norm()/res0)
-                errorsU.append(x[0].norm('l2')/err0U)
-                errorsP.append(x[1].norm('l2')/err0P)
+                errorsU.append(norm(x[0],A)/err0U)
+                errorsP.append(norm(x[1],C)/err0P)
                 if plot_error:
                     uv[:] = numpy.abs(x[0])/err0U
                     pv[:] = numpy.abs(x[1])/err0P
@@ -352,7 +361,7 @@ def run1(prec, runs=[0]):
             if problem==5:
                 numiter *= 3
 
-            AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-10)
+            AAinv = solver(AA, precond=precond, iter=numiter, tolerance=1e-12)
 
             if False:
                 try:
@@ -362,15 +371,22 @@ def run1(prec, runs=[0]):
                 finally:
                     exit()
 
-            xx = AAinv(initial_guess=x0, callback=cb, show=2)*bb
+            xx = AAinv(initial_guess=x0.copy(), callback=cb, show=2)*bb
 
             # Plot
 
             num_iter = AAinv.iterations
 
             pyplot.figure(solver.__name__)
-            pyplot.semilogy(residuals, marker='xo'[runs[0]//7], color=prec.color,
-                            label='%-22s'%(prec.__name__))
+            marker = 'o+o'[runs[0]//2]
+            markersize = [4,6,0][runs[0]//2]
+            linestyle = ':' if 'jacobi' in prec.__name__ else '-'
+            linewidth = 1.5 if 'jacobi' in prec.__name__ else 1.5
+            pyplot.semilogy(residuals, color=prec.color,
+                            #marker='o', markersize=4,
+                            marker=marker, markersize=markersize,
+                            ls=linestyle, lw=linewidth,
+                            label='%-22s'%(prec.__name__), drawstyle='steps-post')
             if test:
                 pyplot.semilogy(errorsU, linestyle='--', color=prec.color)
                 pyplot.semilogy(errorsP, linestyle=':', color=prec.color)
@@ -379,7 +395,7 @@ def run1(prec, runs=[0]):
 
     except Exception, e:
         print prec, e
-        #raise
+        raise
     runs[0] += 1
 
     try:
@@ -455,7 +471,7 @@ def run2end(prec):
         #plot(div(u), key='3', title='div(u)', mode='color')
         #plot(p-(2*nu/Nd+lmbda)*div(u), title='p-tr(sigma)/D', key='4', mode='color')
         #plot((2*mu/Nd+lmbda)*div(u), title='p-z div(u)', key='4', mode='color')
-        plot(p-tr(sigma(u))/Nd, title='p-tr(sigma)/D', key='4.1', mode='color')
+        #plot(p-tr(sigma(u))/Nd, title='p-tr(sigma)/D', key='4.1', mode='color')
         bb = block_assemble([L0,L1]);
         rhs_bc.apply(bb)
 
@@ -470,18 +486,34 @@ if inexact:
     rbm = rigid_body_modes(V)
     Aml = ML(A, pdes=Nd, nullspace=rbm)
 
+    if problem == 4:
+        #run2end(inexact_pressure_schur)
+        pass
+
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
-#    run(inexact_undrained_split)
+    run(inexact_undrained_split)
     run(inexact_drained_split)
     run(inexact_fixed_stress)
-    #run(inexact_fixed_strain)
+    run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
-    run(inexact_pressure_schur)
+    #run(inexact_pressure_schur)
     #run(inexact_gs)
-    #run(inexact_jacobi)
-    run(inexact_homogeneous)
-    run(inexact_homogeneous_pressure_schur)
+    run(inexact_jacobi)
+    #run(inexact_homogeneous)
+    #run(inexact_homogeneous_pressure_schur)
+
+    def ev_est(M, prec):
+        cg = ConjGrad(M, precond=prec, tolerance=1e-20)
+        x = M.create_vec()
+        block_vec([x]).randomize()
+        cg*x
+        ev = cg.eigenvalue_estimates()
+        print ev
+        print ev[-1]/ev[0]
+
+    ev_est(A, Aml)
+    ev_est(-C, ML(collapse(-C), cycles=10))
 
     del Aml
 
@@ -490,51 +522,55 @@ else:
     Ci = MumpsSolver(C)
 
     if problem == 4:
-        run2end(pressure_schur)
-
-#    run(undrained_split)
+        #run2end(pressure_schur)
+        pass
+        
+    run(undrained_split)
     run(drained_split)
     run(fixed_stress)
-    #run(fixed_strain)
+    run(fixed_strain)
     #run(optimized_fixed_stress)
-    run(pressure_schur)
+    #run(pressure_schur)
     #run(exact_A_approx_schur)
     #run(exact_A_ml_schur)
-    #run(jacobi)
-    run(homogeneous)
-    run(homogeneous_pressure_schur)
+    run(jacobi)
+    #run(homogeneous)
+    #run(homogeneous_pressure_schur)
 
     del Ai
     del Ci
 
 try:
-    info = 'd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
+    info = '\nd=%.0e b=%.0e K=%.1e tau=%.1e nu=%.4f'%(delta,b,Kdr,tau,nu)
+    info=''
 except:
     info = ''
 
 try:
     for solver in solvers:
         f = pyplot.figure(solver.__name__)
-        pyplot.ylim(1e-14,1e6)
+        pyplot.ylim(1e-12,1e6)
         #x = f.axes[0].get_xaxis().get_data_interval()
         #pyplot.semilogy(x, [1.0, 1.0], 'k--')
         pyplot.grid()
         pyplot.xlabel('Iterations')
-        pyplot.ylabel('Residual')
-        pyplot.legend(loc='upper right', ncol=2,
-                      prop={'family':'monospace', 'size':'x-small'}).draggable()
-        pyplot.title('%s\n%s'%(solver.__name__, info))
+        pyplot.ylabel(r'Normalized $\ell^2$ residual')
+        #pyplot.legend(loc='upper right', ncol=2,
+        #              prop={'family':'monospace', 'size':'x-small'}).draggable()
+        pyplot.legend(loc='upper right', ncol=1, framealpha=0.5).draggable()
 
-    if MPI.process_number() == 0:
+        pyplot.title(solver.__name__ + info)
+
+    if MPI.rank(None) == 0:
         for solver in solvers:
             f = pyplot.figure(solver.__name__)
-            pyplot.savefig(solver.__name__+'.pdf')
+            pyplot.tight_layout()
+            pyplot.savefig('%s,problem=%d,exact=%d,N=%d.pdf' % (solver.__name__, problem, not inexact, N))
         if not justsave:
             pyplot.show()
-        pass
 
     list_timings()
-except:
-    pass
+except e:
+    raise
 
 print "Finished normally"

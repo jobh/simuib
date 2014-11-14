@@ -9,7 +9,7 @@ N  = int(cl_args.get('N', 10)) # should be even
 mesh = RectangleMesh(-1, -1, 1, 0, N, N//2)
 
 Nd = mesh.topology().dim()
-x = mesh.ufl_cell().x
+x = SpatialCoordinate(mesh)
 
 V = VectorFunctionSpace(mesh, "CG", 1)
 Q = FunctionSpace(mesh, "CG", 1)

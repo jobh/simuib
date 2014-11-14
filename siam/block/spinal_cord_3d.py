@@ -47,6 +47,7 @@ if not os.path.exists(mesh_name):
 mesh = Mesh(mesh_name)
 mesh.order()
 
+N=0
 Nd = mesh.topology().dim()
 
 V = VectorFunctionSpace(mesh, "CG", 1)
@@ -116,7 +117,8 @@ t_n = Constant([0.0]*Nd)
 f_n = Constant([0.0]*Nd)
 n = FacetNormal(mesh)
 h = mesh.hmax()
-dt = Constant(.00125)
+#dt = Constant(.00125)
+dt = Constant(.001)
 T = 0.85#3#0.02
 on = 0
 Q = Constant(0)
@@ -150,8 +152,8 @@ a01 = coupling(omega,q) * dx
 a10 = coupling(v,phi) * dx
 a11 = sum(-(b*phi*q - dt*inner(grad(phi),v_D(K[i], q)) + on*inner(corr(q), grad(phi))) * dx_subd(i) for i in range(3))
 
-L0 = inner(v, -p0*n)*ds_subd(7)
-L1 =  (coupling(u_prev, q) - (Q*dt + b*p_prev)*q - on*inner(corr(p_prev), grad(q))) * dx
+L0 = inner(omega, -p0*n)*ds_subd(7)
+L1 =  (coupling(u_prev, phi) - (Q*dt + b*p_prev)*phi - on*inner(corr(p_prev), grad(phi))) * dx
 
 # Create boundary conditions.
 bcu0 = DirichletBC(V, u0, 3)

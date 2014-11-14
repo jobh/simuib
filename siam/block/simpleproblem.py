@@ -19,7 +19,9 @@ v, omega = TestFunction(V), TrialFunction(V)
 q, phi   = TestFunction(Q), TrialFunction(Q)
 
 u = Function(V)
+u.vector()[:] = 1
 p = Function(Q)
+p.vector()[:] = 1
 
 if False:
     # Perturb mesh
@@ -38,7 +40,7 @@ if False:
 lmbda = Constant(1e4)
 mu    = Constant(1e3)
 delta = 1e-8
-dt    = Constant(1)
+dt    = Constant(.001)
 b     = Constant(1e-6)
 alpha = Constant(1.0)
 
@@ -54,9 +56,9 @@ class Permeability(Expression):
             else:
                 tensor[d,d] = delta
 Lambda = Permeability()
-plot(mesh, interactive=True)
+#plot(mesh, interactive=True)
 
-t_n = Constant( [0.0]*Nd )
+t_n = Constant([0.0,1.0])
 
 T = 0.1
 
@@ -83,11 +85,13 @@ bc_u_bedrock        = DirichletBC(V, [0.0]*Nd, lambda x,bdry: bdry and x[-1] <= 
 bc_p_drained_top    = DirichletBC(Q,  0.0,     lambda x,bdry: bdry and x[-1] >= 1-1/N/3)
 
 bcs = [bc_u_bedrock, bc_p_drained_top]
-bcs = [bc_u_bedrock, None]
+#bcs = [bc_u_bedrock, None]
 
 # Assemble the matrices and vectors
 
 AA = block_assemble([[a00,a10],[a01,a11]])
 bb = block_assemble([L0,L1])
+print bb.norm()
+#exit()
 
 block_bc(bcs, True).apply(AA).apply(bb)
