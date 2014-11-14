@@ -204,10 +204,11 @@ fixed_stress.color='r'
 
 def inexact_fixed_stress():
     # Stable (note sign change)
+    global SC,SCp
     beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
     SCp  = ML(SC)
-    SS = [[MumpsSolver(A), B],
+    SS = [[Aml, B],
           [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_fixed_stress.color='r'
@@ -307,6 +308,8 @@ inexact_homogeneous_pressure_schur.color = 'g'
 x0 = AA.create_vec()
 #numpy.random.seed()
 #x0.randomize()
+#x0[0][:] = 1
+#x0[1][:] = 1
 
 x0s = []
 
@@ -327,13 +330,14 @@ def run1(prec, runs=[0]):
 
             if test:
                 bb.zero()
-                x0[0] *= 1/norm(x0[0],A)
-                x0[1] *= 1/norm(x0[1],C)
+                x0.randomize()
+                x0[0] *= 1/norm(x0[0], A)
+                x0[1] *= 1/norm(x0[1], C)
+                err0U = norm(x0[0], A)
+                err0P = norm(x0[1], C)
 
             # Solve
             res0 = (AA*x0-bb).norm()
-            err0U = norm(x0[0], A)
-            err0P = norm(x0[1], C)
 
             #residuals = [(AA*x0-bb).norm()/res0]
             residuals = [1.0]
@@ -349,8 +353,9 @@ def run1(prec, runs=[0]):
                 interactive(True)
             def cb(k, x, r):
                 residuals.append((AA*x-bb).norm()/res0)
-                errorsU.append(norm(x[0],A)/err0U)
-                errorsP.append(norm(x[1],C)/err0P)
+                if test:
+                    errorsU.append(norm(x[0],A)/err0U)
+                    errorsP.append(norm(x[1],C)/err0P)
                 if plot_error:
                     uv[:] = numpy.abs(x[0])/err0U
                     pv[:] = numpy.abs(x[1])/err0P
@@ -380,7 +385,7 @@ def run1(prec, runs=[0]):
             pyplot.figure(solver.__name__)
             marker = 'o+o'[runs[0]//2]
             markersize = [4,6,0][runs[0]//2]
-            linestyle = ':' if 'jacobi' in prec.__name__ else '-'
+            linestyle = '-' if 'jacobi' in prec.__name__ else '-'
             linewidth = 1.5 if 'jacobi' in prec.__name__ else 1.5
             pyplot.semilogy(residuals, color=prec.color,
                             #marker='o', markersize=4,
@@ -388,8 +393,13 @@ def run1(prec, runs=[0]):
                             ls=linestyle, lw=linewidth,
                             label='%-22s'%(prec.__name__), drawstyle='steps-post')
             if test:
-                pyplot.semilogy(errorsU, linestyle='--', color=prec.color)
-                pyplot.semilogy(errorsP, linestyle=':', color=prec.color)
+                pyplot.semilogy(numpy.sqrt(numpy.array(errorsU)**2+numpy.array(errorsP)**2)/numpy.sqrt(2),
+                                linestyle=':',
+                                color=prec.color,
+                                marker=marker,
+                                markersize=markersize/2,
+                                drawstyle='steps-post')
+                #pyplot.semilogy(errorsP, linestyle=':', color=prec.color)
 
             del t
 
@@ -492,8 +502,8 @@ if inexact:
 
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
-    run(inexact_undrained_split)
-    run(inexact_drained_split)
+#    run(inexact_undrained_split)
+#    run(inexact_drained_split)
     run(inexact_fixed_stress)
     run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
@@ -503,17 +513,28 @@ if inexact:
     #run(inexact_homogeneous)
     #run(inexact_homogeneous_pressure_schur)
 
-    def ev_est(M, prec):
+    def ev_est(M, prec, name):
         cg = ConjGrad(M, precond=prec, tolerance=1e-20)
         x = M.create_vec()
         block_vec([x]).randomize()
         cg*x
         ev = cg.eigenvalue_estimates()
-        print ev
+
+        sign,name2 = ('-', name[1:]) if name[0]=='-' else ('', name)
+        pyplot.figure(name)
+        pyplot.grid()
+        pyplot.title(r'Eigenvalues of $%s\hat{P}%s$'%(sign,name2))
+        pyplot.xlabel('EV#')
+        pyplot.ylabel(r'Value')
+        pyplot.semilogy(ev, '-o', drawstyle='steps-post')
+        pyplot.savefig('EV[%s],problem=%d,exact=%d,N=%d.pdf' % (name, problem, not inexact, N))
+        with open('ev.log', 'a') as f:
+            print >>f, 'EV[%s],problem=%d,N=%d\t%g'%(name,problem,N,ev[-1]/ev[0])
         print ev[-1]/ev[0]
 
-    ev_est(A, Aml)
-    ev_est(-C, ML(collapse(-C), cycles=10))
+    ev_est(A, Aml, "A")
+    ev_est(-C, ML(collapse(-C)), "-C")
+    ev_est(-SC, -SCp, "-S_c")
 
     del Aml
 
@@ -525,8 +546,8 @@ else:
         #run2end(pressure_schur)
         pass
         
-    run(undrained_split)
-    run(drained_split)
+#    run(undrained_split)
+#    run(drained_split)
     run(fixed_stress)
     run(fixed_strain)
     #run(optimized_fixed_stress)

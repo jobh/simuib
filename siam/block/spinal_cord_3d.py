@@ -107,7 +107,8 @@ lmbda = E*nu / ((1.0 + nu)*(1.0 - 2.0*nu))
 beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
 Kf = Constant(2.2e7)
-b = 0.5/Kf + 0.5/Kdr
+#b = 0.5/Kf + 0.5/Kdr
+b = 0
 
 alpha = Constant(1.0)
 #Lambda = Constant(1e-5)#Constant( numpy.diag([.02]*(Nd-1)+[.001]) )

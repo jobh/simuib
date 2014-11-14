@@ -19,9 +19,7 @@ v, omega = TestFunction(V), TrialFunction(V)
 q, phi   = TestFunction(Q), TrialFunction(Q)
 
 u = Function(V)
-u.vector()[:] = 1
 p = Function(Q)
-p.vector()[:] = 1
 
 if False:
     # Perturb mesh
@@ -41,7 +39,7 @@ lmbda = Constant(1e4)
 mu    = Constant(1e3)
 delta = 1e-8
 dt    = Constant(.001)
-b     = Constant(1e-6)
+b     = Constant(0)
 alpha = Constant(1.0)
 
 class Permeability(Expression):
@@ -58,7 +56,13 @@ class Permeability(Expression):
 Lambda = Permeability()
 #plot(mesh, interactive=True)
 
-t_n = Constant([0.0,1.0])
+class t_n(Expression):
+    def value_shape(self):
+        return Nd,
+    def eval(self, value, x):
+        value[0] = x[0]
+        value[1] = -x[1]
+t_n = t_n()
 
 T = 0.1
 

@@ -179,7 +179,8 @@ Q = Constant(0)
 beta = 2*mu + Nd*lmbda
 Kdr = beta/Nd
 Kf = Constant(2.2e9/upm)
-b = 0.5/Kf + 0.5/Kdr
+#b = 0.5/Kf + 0.5/Kdr
+b = 0
 alpha = Constant(1.0)
 
 def sigma(v):
