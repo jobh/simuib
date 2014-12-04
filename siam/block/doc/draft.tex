@@ -1,0 +1,154 @@
+\documentclass{article}
+\usepackage{graphicx,color}
+\usepackage{parskip}
+\begin{document}
+
+Jan, Joachim has run a bunch of simulations and we have looked through them in order to find a reasonable story. 
+Joachim, I already lost the sketch due to moving between offices etc. In planned to write this in google
+docs, but was not able to upload the pdfs as images.  
+
+Anyway, here goes the story. 
+
+
+\begin{figure}
+\begin{center}
+\includegraphics[page=24,width=\linewidth]{presentation.pdf}
+\caption{2D spinal cord problem. The parameters are as shown in the figure, except that $b=0$ everywhere (giving $\tau\rightarrow\infty$), and $\Delta t=10^{-3}$.}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{Richardson,problem=2,exact=1,N=64.pdf}
+\caption{Richardson iterations (exact subsolves) is equivalent to the traditional splitting schemes. The residual is shown as solid lines; energy-norm error as dotted lines. Coupling strength $\tau\rightarrow\infty$ when $b\rightarrow 0$, so the unstable splittings diverge quickly. (Undrained split is not included in the comparison, because it is undefined for $b=0$.)} 
+\label{2dsc-richardson-exact}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{BiCGStab,problem=2,exact=1,N=64.pdf}
+\caption{BiCGStab (exact subsolves). The residuals is shown as solid lines; energy-norm error as dotted lines.}
+\label{2dsc-bicgstab-exact}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{LGMRES,problem=2,exact=1,N=64,cycles=1.pdf}
+\caption{LGMRES (exact subsolves). The residuals is shown as solid lines; energy-norm error as dotted lines. The latter are (nearly?) invisible because they overlap with the residual lines.}
+\label{2dsc-lgmres-exact}
+\end{center}
+\end{figure}
+
+Pictures \ref{2dsc-richardson-exact}--\ref{2dsc-lgmres-exact} shows that Krylov methods are superior to Richardson. This is not a big surprise, but provides
+a clear link to the splitting schemes.
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{Richardson,problem=2,exact=0,N=64.pdf}
+\includegraphics[width=7cm]{LGMRES,problem=2,exact=0,N=64,cycles=1.pdf}
+\caption{Richardson and LGMRES with inexact subsolves (1 cycle of ML).} 
+\label{2dsc-richardson-lgmres-inexact}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{BiCGStab,problem=2,exact=0,N=64.pdf}
+\caption{BiCGStab} 
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{LGMRES,problem=2,exact=0,N=64,cycles=1.pdf}
+\caption{LGMRES} 
+\end{center}
+\end{figure}
+
+The figures also show both the error (in energy norm) and the residual for BiCGStab and LGMRES. 
+Here stripled lines are residual and the solid line is energy. Here, it is clear that it is a
+close correspondance between error and residual for LGMRES and less clear for BiCGStab. We therefore
+continue the discussion with only LGMRES and error.
+
+
+\emph{JBH: It is not immediately obvious that the Krylov methods are very
+  superior, given that BiCGStab is about twice as expensive per iteration, and
+  LGMRES is 30+ times as expensive per iteration. What is clear is: (a) They
+  are reasonable preconditioners, compared to the bog-standard Block Jacobi
+  method; (b) Even the unstable splittings converge, at least in LGMRES; and
+  (c) Error is much better controlled in LGMRES than in either Richardson or
+  BiCGStab.}
+
+Figure \ref{2dsc-richardson-lgmres-inexact} shows that the same pattern holds
+when the splitting is performed using inexact single-block solvers.
+
+Next, lets consider the eigenvalues of the individual components. 
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{EV[A],problem=2,exact=0,N=64.pdf}
+\caption{Eigenvalues} 
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{EV[-C],problem=2,exact=0,N=64.pdf}
+\caption{Eigenvalues} 
+\end{center}
+\end{figure}
+
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{EV[-S_c],problem=2,exact=0,N=64.pdf}
+\caption{Eigenvalues} 
+\end{center}
+\end{figure}
+
+Clearly, the eigenvalues here are nicely bounded. We may here investigate how 
+the number of ML sweeps affect the eigenvalues.  
+
+This more or less concludes the discussion of the 2D spinal cord example. 
+
+\emph{JBH: Can we drop everything except LGMRES on (inexact) fixed stress in the rest of the examples?}
+
+\begin{figure}
+\begin{center}
+\includegraphics[page=36,width=\linewidth]{presentation.pdf}
+\caption{Contrast problem. There are differences in the parameters. Again $b=0$ everywhere (giving $\tau\rightarrow\infty$), and $\Delta t=10^{-3}$. Also, $p=0$ at the top, and $E$ is 1/10 of that shown here. These changes are arbitrary: I can create new figures with the same parameters if necessary.}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{Richardson,problem=1,exact=0,N=20.pdf}
+\caption{Contrast problem, Richardson, $N=20$.}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{Richardson,problem=1,exact=0,N=160.pdf}
+\caption{Contrast problem, Richardson, $N=160$.}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{LGMRES,problem=1,exact=0,N=20,cycles=1.pdf}
+\caption{Contrast problem, LGMRES, $N=20$.}
+\end{center}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=7cm]{LGMRES,problem=1,exact=0,N=160,cycles=1.pdf}
+\caption{Contrast problem, LGMRES, $N=160$.}
+\end{center}
+\end{figure}
+
+
+\end{document}
+

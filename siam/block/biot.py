@@ -25,6 +25,13 @@ def get_command_line_arguments():
 cl_args = get_command_line_arguments()
 problem = int(cl_args.get('problem', 2))
 if problem == 1:
+    delta=1e-8
+    execfile('simpleproblem.py')
+elif problem == 14:
+    delta=1e-4
+    execfile('simpleproblem.py')
+elif problem == 12:
+    delta=1e-12
     execfile('simpleproblem.py')
 elif problem == 2:
     execfile('spinal_cord_2d.py')
@@ -41,9 +48,10 @@ if not issymmetric(AA):
     raise RuntimeError("not symmetric")
 
 plot_error = int(cl_args.get("plot_error", 0))
-test = plot_error or int(cl_args.get("test", 0))
+test = plot_error or int(cl_args.get("test", 1))
 justsave = int(cl_args.get("justsave", 0))
 inexact = int(cl_args.get("inexact", 0))
+ml_cycles = int(cl_args.get("ml_cycles", 1))
 
 #===== Print some derived quantities ===
 beta = 2*mu + Nd*lmbda
@@ -62,12 +70,13 @@ try:
     print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
 except:
     pass
+exit()
 
 #solvers = [BiCGStab, LGMRES, Richardson]
-solvers = [BiCGStab, Richardson]
+#solvers = [BiCGStab, Richardson]
 #solvers = [BiCGStab]
 #solvers = [Richardson]
-#solvers = [LGMRES]
+solvers = [LGMRES]
 
 # Assemble the matrices and vectors
 
@@ -91,27 +100,27 @@ def exact_A_approx_schur():
     return block_mat(SS).scheme('sgs')
 
 def inexact_pressure_schur():
-    Sp = ML(collapse(C-B.T*InvDiag(A)*B))
+    Sp = ML(collapse(C-B.T*InvDiag(A)*B), cycles=ml_cycles)
     SS = [[Aml, B],
           [B.T,  Sp ]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_pressure_schur.color = 'c'
 
 def inexact_symm_schur():
-    Sp = ML(collapse(C-B.T*InvDiag(A)*B))
+    Sp = ML(collapse(C-B.T*InvDiag(A)*B), cycles=ml_cycles)
     SS = [[Aml, 0],
           [0,  Sp]]
     return block_mat(SS).scheme('sgs')
 inexact_symm_schur.color='k'
 
 def inexact_gs():
-    Cp = ML(C)
+    Cp = ML(C, cycles=ml_cycles)
     SS = [[Aml, B],
           [B.T, Cp]]
     return block_mat(SS).scheme('tgs')
 
 def inexact_jacobi():
-    Cp = ML(C)
+    Cp = ML(C, cycles=ml_cycles)
     #Sp = ML(collapse(C-B.T*InvDiag(A)*B))
     SS = [[Aml, B],
           [B.T, Cp]]
@@ -125,14 +134,14 @@ def jacobi():
 jacobi.color='k'
 
 def exact_A_ml_schur():
-    Sp = ML(collapse(C-B.T*InvDiag(A)*B))
+    Sp = ML(collapse(C-B.T*InvDiag(A)*B), cycles=ml_cycles)
     SS = [[Ai, B],
           [B.T, Sp]]
     return block_mat(SS).scheme('sgs')
 
 def inexact_drained_split():
     SS = [[Aml, B],
-          [B.T, ML(C)]]
+          [B.T, ML(C, cycles=ml_cycles)]]
     return block_mat(SS).scheme('tgs')
 inexact_drained_split.color = 'y'
 
@@ -172,11 +181,11 @@ def inexact_undrained_split():
     b_i = InvDiag(b_)
     global SAi_
     if SAi_ is None:
-        SAi_ = ML(collapse(A-B*b_i*B.T))
+        SAi_ = ML(collapse(A-B*b_i*B.T), cycles=ml_cycles)
     SAi = SAi_
 
     SS = [[SAi, B],
-          [B.T, ML(C)]]
+          [B.T, ML(C, cycles=ml_cycles)]]
     return block_mat(SS).scheme('tgs')
 inexact_undrained_split.color = 'b'
 
@@ -188,7 +197,7 @@ fixed_strain.color = 'g'
 
 def inexact_fixed_strain():
     SS = [[Aml, B],
-          [B.T, ML(C)]]
+          [B.T, ML(C, cycles=ml_cycles)]]
     return block_mat(SS).scheme('tgs', reverse=True)
 inexact_fixed_strain.color = 'g'
 
@@ -207,7 +216,7 @@ def inexact_fixed_stress():
     global SC,SCp
     beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd*beta_inv)
-    SCp  = ML(SC)
+    SCp  = ML(SC, cycles=ml_cycles)
     SS = [[Aml, B],
           [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
@@ -217,7 +226,7 @@ def inexact_optimized_fixed_stress():
     # Stable (note sign change)
     beta_inv = assemble(-alpha/beta*q*phi*dx)
     SC   = collapse(C+Nd/2*beta_inv)
-    SCp  = ML(SC)
+    SCp  = ML(SC, cycles=ml_cycles)
     SS = [[Aml, B],
           [B.T, SCp]]
     return block_mat(SS).scheme('tgs', reverse=True)
@@ -272,8 +281,8 @@ def inexact_homogeneous():
     [[Ahom, Bhom],
      [_, Chom]]  = create_homogeneous()
 
-    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
-    Cinv = ML(Chom)
+    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm, cycles=ml_cycles)
+    Cinv = ML(Chom, cycles=ml_cycles)
     SS = block_mat([[Ainv, Bhom],
                     [Bhom.T, Cinv]])
     return SS.scheme('tgs')
@@ -297,7 +306,7 @@ def inexact_homogeneous_pressure_schur():
      [_, Chom]]  = create_homogeneous()
 
     Sinv = MumpsSolver(collapse(Chom-Bhom.T*InvDiag(Ahom)*Bhom))
-    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm)
+    Ainv = ML(Ahom, pdes=Nd, nullspace=rbm, cycles=ml_cycles)
     SS = block_mat([[Ainv, Bhom],
                     [Bhom.T, Sinv]])
     return SS.scheme('tgs')
@@ -362,7 +371,7 @@ def run1(prec, runs=[0]):
                     plot(u, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
                     plot(p, mode='color')
                     interactive()
-            numiter = 10 if solver == LGMRES else 50
+            numiter = 15 if solver == LGMRES else 50
             if problem==5:
                 numiter *= 3
 
@@ -494,7 +503,7 @@ run=run1
 
 if inexact:
     rbm = rigid_body_modes(V)
-    Aml = ML(A, pdes=Nd, nullspace=rbm)
+    Aml = ML(A, pdes=Nd, nullspace=rbm, cycles=ml_cycles)
 
     if problem == 4:
         #run2end(inexact_pressure_schur)
@@ -503,7 +512,7 @@ if inexact:
     #run(exact_C_approx_schur
     #run(inexact_symm_schur)
 #    run(inexact_undrained_split)
-#    run(inexact_drained_split)
+    run(inexact_drained_split)
     run(inexact_fixed_stress)
     run(inexact_fixed_strain)
     #run(inexact_optimized_fixed_stress)
@@ -527,13 +536,13 @@ if inexact:
         pyplot.xlabel('EV#')
         pyplot.ylabel(r'Value')
         pyplot.semilogy(ev, '-o', drawstyle='steps-post')
-        pyplot.savefig('EV[%s],problem=%d,exact=%d,N=%d.pdf' % (name, problem, not inexact, N))
+        pyplot.savefig('EV[%s],problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (name, problem, not inexact, N, ml_cycles))
         with open('ev.log', 'a') as f:
-            print >>f, 'EV[%s],problem=%d,N=%d\t%g'%(name,problem,N,ev[-1]/ev[0])
+            print >>f, 'EV[%s],problem=%d,N=%d\t%g,cycles=%d'%(name,problem,N,ev[-1]/ev[0], ml_cycles)
         print ev[-1]/ev[0]
 
     ev_est(A, Aml, "A")
-    ev_est(-C, ML(collapse(-C)), "-C")
+    ev_est(-C, ML(collapse(-C), cycles=ml_cycles), "-C")
     ev_est(-SC, -SCp, "-S_c")
 
     del Aml
@@ -547,7 +556,7 @@ else:
         pass
         
 #    run(undrained_split)
-#    run(drained_split)
+    run(drained_split)
     run(fixed_stress)
     run(fixed_strain)
     #run(optimized_fixed_stress)
@@ -586,7 +595,7 @@ try:
         for solver in solvers:
             f = pyplot.figure(solver.__name__)
             pyplot.tight_layout()
-            pyplot.savefig('%s,problem=%d,exact=%d,N=%d.pdf' % (solver.__name__, problem, not inexact, N))
+            pyplot.savefig('%s,problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (solver.__name__, problem, not inexact, N, ml_cycles))
         if not justsave:
             pyplot.show()
 

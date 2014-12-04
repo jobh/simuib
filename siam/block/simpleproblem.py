@@ -37,7 +37,6 @@ if False:
 
 lmbda = Constant(1e4)
 mu    = Constant(1e3)
-delta = 1e-8
 dt    = Constant(.001)
 b     = Constant(0)
 alpha = Constant(1.0)
