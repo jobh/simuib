@@ -366,7 +366,12 @@ def run1(prec, runs=[0]):
                     plot(u, mode='color', title='%s %s'%(prec.__name__, solver.__name__))
                     plot(p, mode='color')
                     interactive()
-            numiter = 15 if solver == LGMRES else 50
+            numiter = 300
+            if solver == BiCGStab:
+                numiter //= 2
+            elif solver == LGMRES:
+                numiter //= 30
+
             if problem==5:
                 numiter *= 3
 
@@ -392,17 +397,15 @@ def run1(prec, runs=[0]):
             linestyle = '-' if 'jacobi' in prec.__name__ else '-'
             linewidth = 1.5 if 'jacobi' in prec.__name__ else 1.5
             pyplot.semilogy(residuals, color=prec.color,
-                            #marker='o', markersize=4,
-                            marker=marker, markersize=markersize,
+                            #marker=marker, markersize=markersize,
                             ls=linestyle, lw=linewidth,
-                            label='%-22s'%(prec.__name__), drawstyle='steps-post')
+                            label='%-22s'%(prec.__name__))#, drawstyle='steps-post')
             if test:
                 pyplot.semilogy(numpy.sqrt(numpy.array(errorsU)**2+numpy.array(errorsP)**2)/numpy.sqrt(2),
                                 linestyle=':',
-                                color=prec.color,
-                                marker=marker,
-                                markersize=markersize/2,
-                                drawstyle='steps-post')
+                                color=prec.color)
+                                #marker=marker, markersize=markersize/2,
+                                #drawstyle='steps-post')
                 #pyplot.semilogy(errorsP, linestyle=':', color=prec.color)
 
             del t
@@ -592,7 +595,7 @@ try:
             f = pyplot.figure(solver.__name__)
             pyplot.tight_layout()
             if not nosave:
-                pyplot.savefig('%s,problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (solver.__name__, problem, not inexact, N, ml_cycles))
+                pyplot.savefig('new-%s,problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (solver.__name__, problem, not inexact, N, ml_cycles))
         if not justsave:
             pyplot.show()
 
