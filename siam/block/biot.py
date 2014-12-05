@@ -50,8 +50,11 @@ if not issymmetric(AA):
 plot_error = int(cl_args.get("plot_error", 0))
 test = plot_error or int(cl_args.get("test", 1))
 justsave = int(cl_args.get("justsave", 0))
+nosave = int(cl_args.get("nosave", 0))
 inexact = int(cl_args.get("inexact", 0))
 ml_cycles = int(cl_args.get("ml_cycles", 1))
+
+solvers = map(eval, cl_args.get("solvers", "Richardson").split(','));
 
 #===== Print some derived quantities ===
 beta = 2*mu + Nd*lmbda
@@ -62,7 +65,6 @@ try:
     E = mu/nu* ((1.0 + nu)*(1.0 - 2.0*nu))
     print 'E =%g'%float(E)
     print 'Kdr =%g'%float(Kdr)
-    exit()
 except:
     pass
 try:
@@ -70,13 +72,6 @@ try:
     print 'Bulk modulus = %.2g, Poisson ratio = %.2g, coupling strength = %.2g' % (Kdr,nu,tau)
 except:
     pass
-exit()
-
-#solvers = [BiCGStab, LGMRES, Richardson]
-#solvers = [BiCGStab, Richardson]
-#solvers = [BiCGStab]
-#solvers = [Richardson]
-solvers = [LGMRES]
 
 # Assemble the matrices and vectors
 
@@ -536,7 +531,8 @@ if inexact:
         pyplot.xlabel('EV#')
         pyplot.ylabel(r'Value')
         pyplot.semilogy(ev, '-o', drawstyle='steps-post')
-        pyplot.savefig('EV[%s],problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (name, problem, not inexact, N, ml_cycles))
+        if not nosave:
+            pyplot.savefig('EV[%s],problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (name, problem, not inexact, N, ml_cycles))
         with open('ev.log', 'a') as f:
             print >>f, 'EV[%s],problem=%d,N=%d\t%g,cycles=%d'%(name,problem,N,ev[-1]/ev[0], ml_cycles)
         print ev[-1]/ev[0]
@@ -595,7 +591,8 @@ try:
         for solver in solvers:
             f = pyplot.figure(solver.__name__)
             pyplot.tight_layout()
-            pyplot.savefig('%s,problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (solver.__name__, problem, not inexact, N, ml_cycles))
+            if not nosave:
+                pyplot.savefig('%s,problem=%d,exact=%d,N=%d,cycles=%d.pdf' % (solver.__name__, problem, not inexact, N, ml_cycles))
         if not justsave:
             pyplot.show()
 
