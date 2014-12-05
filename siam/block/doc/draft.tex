@@ -62,16 +62,20 @@ a clear link to the splitting schemes.
 The figures also show both the error (in energy norm) and the residual for BiCGStab and LGMRES. 
 Here dotted lines are residual and the solid line is energy. Here, it is clear that it is a
 close correspondance between error and residual for LGMRES and less clear for BiCGStab. We therefore
-continue the discussion with only LGMRES and error.
+continue the discussion with only LGMRES and error. 
 
 
-\emph{JBH: It is not immediately obvious that the Krylov methods are very
-  superior. Given that BiCGStab is about twice as expensive per iteration, and
-  LGMRES is 30+ times as expensive per iteration, they may something like 30\%
-  faster. What is clear is: (a) They are reasonable preconditioners, compared
-  to the bog-standard Block Jacobi method; (b) Even the unstable splittings
-  converge, at least in LGMRES; and (c) Error is much better controlled in
-  LGMRES than in either Richardson or BiCGStab.}
+Note to be included in the discussion: 
+It is not immediately obvious that the Krylov methods are very
+superior. Given that BiCGStab is about twice as expensive per iteration, and
+LGMRES is 30+ times as expensive per iteration, they may something like 30\%
+faster. What is clear is: (a) They are reasonable preconditioners, compared
+to the bog-standard Block Jacobi method; (b) Even the unstable splittings
+converge, at least in LGMRES; and (c) Error is much better controlled in
+LGMRES than in either Richardson or BiCGStab. In the contrast example
+we would expect larger differences between Richardson and Krylov since Krylov
+methods may pich up outliers (and there are few in the contrast example). 
+At least CG and MinRes has this property. LGMRES and BiCGStab might not. 
 
 Figure \ref{2dsc-richardson-lgmres-inexact} shows that the same pattern holds
 when the splitting is performed using inexact single-block solvers.
